@@ -137,6 +137,34 @@ export async function requestLoginCode(
   return { email, codeId: Number(inserted.id) };
 }
 
+export async function createSessionForEmail(env: Env, email: string): Promise<{ sessionToken: string; user: SessionUser }> {
+  const normalizedEmail = email.trim().toLowerCase();
+  if (!/^[^@\\s]+@[^@\\s]+$/.test(normalizedEmail)) throw new Error("Ungültige E-Mail-Adresse.");
+
+  const existing = await env.DB.prepare(
+    "SELECT id, email, class_name AS className FROM users WHERE email = ? LIMIT 1",
+  ).bind(normalizedEmail).first<SessionUser>();
+
+  let user: SessionUser;
+  if (existing) {
+    user = { id: Number(existing.id), email: existing.email, className: existing.className ?? null };
+  } else {
+    const inserted = await env.DB.prepare(
+      "INSERT INTO users (email, class_name, created_at, updated_at) VALUES (?, NULL, ?, ?) RETURNING id",
+    ).bind(normalizedEmail, new Date().toISOString(), new Date().toISOString()).first<{ id: number }>();
+    if (!inserted?.id) throw new Error("Benutzer konnte nicht angelegt werden.");
+    user = { id: Number(inserted.id), email: normalizedEmail, className: null };
+  }
+
+  const sessionToken = randomToken();
+  const sessionHash = await sha256(sessionToken);
+  await env.DB.prepare(
+    "INSERT INTO sessions (token_hash, user_id, expires_at, created_at) VALUES (?, ?, ?, ?)",
+  ).bind(sessionHash, user.id, nowPlusDays(SESSION_DAYS), new Date().toISOString()).run();
+
+  return { sessionToken, user };
+}
+
 export async function verifyLoginCode(
   env: Env,
   email: string,
@@ -170,28 +198,7 @@ export async function verifyLoginCode(
 
   await env.DB.prepare("UPDATE login_codes SET used = 1 WHERE id = ?").bind(row.id).run();
 
-  const existing = await env.DB.prepare(
-    "SELECT id, email, class_name AS className FROM users WHERE email = ? LIMIT 1",
-  ).bind(normalizedEmail).first<SessionUser>();
-
-  let user: SessionUser;
-  if (existing) {
-    user = { id: Number(existing.id), email: existing.email, className: existing.className ?? null };
-  } else {
-    const inserted = await env.DB.prepare(
-      "INSERT INTO users (email, class_name, created_at, updated_at) VALUES (?, NULL, ?, ?) RETURNING id",
-    ).bind(normalizedEmail, new Date().toISOString(), new Date().toISOString()).first<{ id: number }>();
-    if (!inserted?.id) throw new Error("Benutzer konnte nicht angelegt werden.");
-    user = { id: Number(inserted.id), email: normalizedEmail, className: null };
-  }
-
-  const sessionToken = randomToken();
-  const sessionHash = await sha256(sessionToken);
-  await env.DB.prepare(
-    "INSERT INTO sessions (token_hash, user_id, expires_at, created_at) VALUES (?, ?, ?, ?)",
-  ).bind(sessionHash, user.id, nowPlusDays(SESSION_DAYS), new Date().toISOString()).run();
-
-  return { sessionToken, user };
+  const session = await createSessionForEmail(env, normalizedEmail);\n\n
 }
 
 export async function getSession(request: Request, env: Env): Promise<{ token: string; user: SessionUser } | null> {
