@@ -61,7 +61,7 @@ body:
     attributes:
       label: Environment
       description: Relevant runtime information.
-      placeholder: "e.g. Cloudflare Workers, Node.js 20, npm 10"
+      placeholder: "e.g. Cloudflare Workers, Node.js 22, npm 10"
 
   - type: textarea
     id: logs
