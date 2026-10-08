@@ -473,7 +473,9 @@ npm run typecheck
 
 Apply any required production database migrations:
 
-```npm run db:migrate:remote```
+```bash
+npm run db:migrate:remote
+```
 
 Then deploy the Worker:
 
