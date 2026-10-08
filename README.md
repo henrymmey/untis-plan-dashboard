@@ -109,6 +109,7 @@ This also allows corrected versions of the same plan to coexist.
 │   ├── parser.ts
 │   ├── smtp.ts
 │   └── types.ts
+├── CODE_OF_CONDUCT.md
 ├── .env.example
 ├── LICENSE
 ├── package.json
@@ -118,7 +119,7 @@ This also allows corrected versions of the same plan to coexist.
 
 ## Requirements
 
-- Node.js 20 or newer
+- Node.js 22 or newer
 - npm
 - A Cloudflare account
 - Cloudflare Workers
