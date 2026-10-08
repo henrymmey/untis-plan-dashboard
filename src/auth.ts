@@ -161,6 +161,7 @@ export async function consumeLoginChallenge(env: Env, token: string, email: stri
 export async function createSessionForEmail(env: Env, email: string): Promise<{ sessionToken: string; user: SessionUser }> {
   const normalizedEmail = email.trim().toLowerCase();
   if (!/^[^@\s]+@[^@\s]+$/.test(normalizedEmail)) throw new Error("Ungültige E-Mail-Adresse.");
+  if (!(await isUserAllowed(env, normalizedEmail))) throw new Error("Dein Konto ist derzeit nicht für den Vertretungsplan freigeschaltet.");
 
   const existing = await env.DB.prepare(
     "SELECT id, email, class_name AS className FROM users WHERE email = ? LIMIT 1",
