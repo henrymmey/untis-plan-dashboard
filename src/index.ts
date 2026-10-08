@@ -37,7 +37,7 @@ async function handleApi(request:Request,env:Env){
   if(request.headers.get("Authorization")!=="Bearer "+env.API_KEY)return errorJson("Unauthorized.",401,{"WWW-Authenticate":'Bearer realm="untis-to-api"'});
   const p=parts(new URL(request.url));if(p[0]!=="vertretung"||p[1]!=="plan")return errorJson("Not found.",404);
   const date=p[2],versionText=p[3],className=p[4]?decodeURIComponent(p[4]):env.DEFAULT_CLASS;
-  if(!date||!/^\\d{4}-\\d{2}-\\d{2}$/.test(date))return errorJson("Invalid date. Use YYYY-MM-DD.",400);
+  if(!date||!/^\d{4}-\d{2}-\d{2}$/.test(date))return errorJson("Invalid date. Use YYYY-MM-DD.",400);
   if(p.length===3){const row=await env.DB.prepare("SELECT data_json FROM plans WHERE plan_date=? AND class_name=? ORDER BY version DESC LIMIT 1").bind(date,className).first();if(!row)return errorJson("No plan found for this date.",404);return json(JSON.parse(String(row.data_json)));}
   const version=Number(versionText);if(!Number.isInteger(version)||version<1)return errorJson("Invalid version.",400);
   const row=await env.DB.prepare("SELECT data_json FROM plans WHERE plan_date=? AND version=? AND class_name=? LIMIT 1").bind(date,version,className).first();if(!row)return errorJson("Plan version not found.",404);return json(JSON.parse(String(row.data_json)));
