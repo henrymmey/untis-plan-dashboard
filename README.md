@@ -482,9 +482,47 @@ Andere Nutzer müssen keine Mailweiterleitung einrichten.
 
 ### Outbound E-Mail
 
-Die Login-Codes werden über den Cloudflare Email Service aus dem Worker versendet. Dafür ist in `wrangler.jsonc` ein `send_email`-Binding mit dem Absender `noreply.homelab@henrymeyer.de` konfiguriert.
+Die Login-Codes werden **nicht über Cloudflare Email Sending** verschickt.
 
-Vor dem ersten produktiven Versand muss `henrymeyer.de` im Cloudflare Email Service für Email Sending onboarded sein. Cloudflare verlangt dafür die entsprechende Domain-Konfiguration einschließlich SPF/DKIM. Das Binding ist auf den genannten Absender beschränkt.
+Der Worker verbindet sich direkt per SMTP mit dem separaten Mailpostfach:
+
+`noreply.homelab@henrymeyer.de`
+
+Cloudflare Workers unterstützt dafür ausgehende TCP-Verbindungen über `cloudflare:sockets`; SMTP über Port 465 (TLS) oder 587 (STARTTLS) kann damit direkt angesprochen werden. Port 25 ist aus Workers gesperrt. citeturn0search0
+
+Die SMTP-Zugangsdaten werden nicht ins Repository geschrieben:
+
+~~~bash
+npx wrangler secret put SMTP_PASSWORD
+~~~
+
+In `wrangler.jsonc` müssen außerdem der echte SMTP-Server, Port, Sicherheitsmodus und Benutzername eingetragen werden:
+
+~~~text
+SMTP_HOST
+SMTP_PORT
+SMTP_SECURITY
+SMTP_USERNAME
+SMTP_PASSWORD
+~~~
+
+Beispiel für einen Server mit SMTPS:
+
+~~~text
+SMTP_HOST=smtp.dein-mailanbieter.de
+SMTP_PORT=465
+SMTP_SECURITY=tls
+SMTP_USERNAME=noreply.homelab@henrymeyer.de
+~~~
+
+Für einen Server mit STARTTLS:
+
+~~~text
+SMTP_PORT=587
+SMTP_SECURITY=starttls
+~~~
+
+Der SMTP-Server muss natürlich externe SMTP-Verbindungen von Cloudflare Workers akzeptieren. Der Login-Code wird ausschließlich über diese Verbindung versendet.
 
 ### D1-Migration
 
