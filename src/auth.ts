@@ -1,5 +1,6 @@
 import type { Env } from "./types";
 import { sendSmtpMail } from "./smtp";
+import { isUserAllowed } from "./access";
 
 const SESSION_DAYS = 30;
 const CODE_MINUTES = 10;
@@ -238,6 +239,7 @@ export async function getSession(request: Request, env: Env): Promise<{ token: s
   }>();
 
   if (!row) return null;
+  if (!(await isUserAllowed(env, row.email))) return null;
   if (new Date(row.expires_at).getTime() <= Date.now()) {
     await env.DB.prepare("DELETE FROM sessions WHERE token_hash = ?").bind(tokenHash).run();
     return null;
