@@ -72,6 +72,17 @@ const addDays = (d: string, n: number) => {
   return x.toISOString().slice(0, 10);
 };
 
+const addSchoolDay = (d: string, direction: 1 | -1) => {
+  let next = addDays(d, direction);
+  const weekday = new Date(next + "T12:00:00Z").getUTCDay();
+  while (weekday === 0 || weekday === 6) {
+    next = addDays(next, direction);
+    const day = new Date(next + "T12:00:00Z").getUTCDay();
+    if (day !== 0 && day !== 6) break;
+  }
+  return next;
+};
+
 const errorBox = (e?: string) => (e ? '<div class="error">' + esc(e) + "</div>" : "");
 
 function login(env: Env, error?: string) {
@@ -219,9 +230,9 @@ async function home(env: Env, className: string, date: string, email: string) {
     '</div></div><div class="header-actions">' +
     adminLink +
     '<a class="settings-link" href="/settings">Einstellungen</a><form method="post" action="/logout"><button class="secondary logout-button">Abmelden</button></form></div></header><nav><a href="/?date=' +
-    esc(addDays(date, -1)) +
+    esc(addSchoolDay(date, -1)) +
     '">← Vorheriger Tag</a><a href="/?date=' +
-    esc(addDays(date, 1)) +
+    esc(addSchoolDay(date, 1)) +
     '">Nächster Tag →</a></nav><section class="card">' +
     (p?.lessons?.length ? p.lessons.map(lesson).join("") : '<div class="empty">Für ' + esc(className) + " ist an diesem Tag kein Plan vorhanden.</div>") +
     '</section><footer><a href="https://github.com/henrymmey/untis-to-api" target="_blank" rel="noopener noreferrer">GitHub Repository</a> · <a href="https://henrymeyer.de/" target="_blank" rel="noopener noreferrer">Developed by Henry Meyer</a></footer>';
