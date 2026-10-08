@@ -12,7 +12,7 @@ export interface Env {
   TURNSTILE_SITEKEY: string;
   TURNSTILE_SECRET: string;
   DEFAULT_CLASS: string;
-  API_KEY: string;
+  API_KEY: string;\n  OIDC_ISSUER: string;\n  OIDC_CLIENT_ID: string;\n  OIDC_CLIENT_SECRET: string;\n  OIDC_REDIRECT_URI: string;
 }
 
 export interface LessonChange {
