@@ -27,6 +27,9 @@
     "SMTP_SECURITY": "tls",
     "SMTP_USERNAME": "noreply.homelab@henrymeyer.de",
     "TURNSTILE_SITEKEY": "0x4AAAAAAFRmuXDndka5BrhJ",
+    "OIDC_ISSUER": "https://auth.meyerwolke.de/application/o/obs-vertretungsplan/",
+    "OIDC_CLIENT_ID": "7WgH0i8VV0PmB2yFJY6MTAT3gYKeHHyK9sMXYcJP",
+    "OIDC_REDIRECT_URI": "https://obs.henrymeyer.de/auth/oidc/callback",
   },
   "routes": [
     {
