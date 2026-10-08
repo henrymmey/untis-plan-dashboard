@@ -18,7 +18,7 @@
     }
   ],
   "vars": {
-    "ALLOWED_SENDER": "vertretung@obs-hagen-atw.de",
+    "ALLOWED_SENDER": "vertretung@example-school.de",
     "TARGET_CLASS": "9-G1"
   },
   "routes": [
