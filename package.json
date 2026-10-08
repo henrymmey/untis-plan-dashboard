@@ -17,7 +17,7 @@
     "postal-mime": "^3.0.0"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^5.20261008.1",
+    "@types/node": "^24.7.2",
     "typescript": "^5.9.3",
     "wrangler": "^4.113.0"
   }
