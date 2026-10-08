@@ -15,7 +15,7 @@ const errorBox=(e?:string)=>e?'<div class="error">'+esc(e)+"</div>":"";
 
 function login(env:Env,error?:string){return page("Anmelden · Vertretungsplan",'<section class="auth"><div class="brand">Vertretungsplan</div><h1>Anmelden</h1><p class="muted">Melde dich mit deinem IServ-Benutzername an. Wir schicken dir einen einmaligen Code per E-Mail.</p>'+errorBox(error)+'<form method="post" action="/login"><div class="cf-turnstile" data-sitekey="'+esc(env.TURNSTILE_SITEKEY)+'" data-action="login"></div><label>IServ-Benutzername</label><div class="email"><input name="username" autocomplete="username" autocapitalize="none" spellcheck="false" maxlength="64" required placeholder="vorname.nachname"><span>@obs-hagen-atw.de</span></div><button>Weiter</button></form></section>');}
 
-function accessDenied(){return page("Kein Zugriff · Vertretungsplan",'<section class="auth"><div class="brand">Vertretungsplan</div><h1>Kein Zugriff</h1><p class="muted">Dein Konto ist für den Vertretungsplan derzeit nicht freigeschaltet.</p><a class="back" href="/">Zur Anmeldung</a></section>");}
+function accessDenied(){return page("Kein Zugriff · Vertretungsplan",'<section class="auth"><div class="brand">Vertretungsplan</div><h1>Kein Zugriff</h1><p class="muted">Dein Konto ist für den Vertretungsplan derzeit nicht freigeschaltet.</p><a class="back" href="/">Zur Anmeldung</a></section>');}
 
 function adminPage(config:{everyone:boolean;allowedUsers:string[]},error?:string){
   const users=config.allowedUsers.join("\n");
