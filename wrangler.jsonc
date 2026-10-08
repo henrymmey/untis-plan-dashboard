@@ -1,0 +1,30 @@
+{
+  "name": "untis-to-api",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-06",
+  "compatibility_flags": ["nodejs_compat"],
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "untis_to_api",
+      "database_id": "REPLACE_WITH_D1_DATABASE_ID",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "PDF_BUCKET",
+      "bucket_name": "untis-to-api-pdfs"
+    }
+  ],
+  "vars": {
+    "ALLOWED_SENDER": "vertretung@obs-hagen-atw.de",
+    "TARGET_CLASS": "9-G1"
+  },
+  "routes": [
+    {
+      "pattern": "domain.de/vertretung/*",
+      "zone_name": "domain.de"
+    }
+  ]
+}
