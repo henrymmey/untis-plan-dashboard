@@ -14,7 +14,7 @@ For security vulnerabilities, do **not** open a public issue. Please follow the 
 
 Requirements:
 
-- Node.js 20 or newer
+- Node.js 22 or newer
 - npm
 - A Cloudflare account for production-related development
 - Wrangler CLI access
