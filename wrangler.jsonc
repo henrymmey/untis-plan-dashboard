@@ -22,7 +22,7 @@
     "ISERV_DOMAIN": "obs-hagen-atw.de",
     "EMAIL_FROM": "noreply.homelab@henrymeyer.de",
     "DEFAULT_CLASS": "9-G1",
-    "SMTP_HOST": "smtp.example.com",
+    "SMTP_HOST": "mail.spacemail.com",
     "SMTP_PORT": "465",
     "SMTP_SECURITY": "tls",
     "SMTP_USERNAME": "noreply.homelab@henrymeyer.de"
