@@ -2,7 +2,7 @@
 
 Automatisiert den Vertretungsplan der Example School aus weitergeleiteten IServ-Mails und stellt die Daten als JSON-API bereit.
 
-Die aktuelle Konfiguration ist auf **9-G1** und **vertretung@example-school.de** ausgelegt.
+Die aktuelle Produktivkonfiguration verarbeitet alle unterstützten Klassen; `DEFAULT_CLASS` bleibt für die rückwärtskompatible API-Abkürzung auf `9-G1` gesetzt.
 
 ## Architektur
 
@@ -20,7 +20,7 @@ Cloudflare Worker
   |- PDF-Anhang finden
   |- PDF-Text extrahieren
   |- Datum + Untis-Version erkennen
-  |- 9-G1-Zeilen extrahieren
+  |- alle unterstützten Klassen extrahieren
   |- Original-PDF -> R2
   '- strukturierte Daten -> D1
           |
@@ -178,7 +178,7 @@ In wrangler.jsonc:
 
 ALLOWED_SENDER verhindert, dass beliebige Personen PDFs einschleusen.
 
-TARGET_CLASS bestimmt die Klasse, die beim Import berücksichtigt wird.
+DEFAULT_CLASS bestimmt die Klasse für API-Aufrufe ohne explizite Klassenangabe.
 
 ## 8. Worker deployen
 
@@ -326,7 +326,7 @@ Der Parser sucht im PDF insbesondere nach:
 - Statt-Vertretung
 - Raum-Vtr.
 
-Die aktuelle Logik ist an die vorliegende Untis-Struktur angepasst. Wenn die Schule das PDF-Layout ändert, muss der Parser mit einem neuen Beispiel getestet werden.
+Die aktuelle Logik ist an die vorliegende Untis-Struktur angepasst und speichert alle erkannten Klassen. Wenn die Schule das PDF-Layout ändert, muss der Parser mit einem neuen Beispiel getestet werden.
 
 ## 19. Warum R2 und D1?
 
@@ -510,7 +510,7 @@ Die bisherige API bleibt erhalten. Ohne Klassenangabe verwendet sie weiterhin `D
 Für eine andere Klasse:
 
 ~~~text
-GET /vertretung/plan/2026-10-09/9-G2
+GET /vertretung/plan/2026-10-09/2/9-G2
 ~~~
 
 Für eine bestimmte Version:
