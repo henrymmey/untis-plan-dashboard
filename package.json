@@ -14,7 +14,7 @@
   },
   "dependencies": {
     "unpdf": "^1.8.1",
-    "postal-mime": "^3.0.0"
+    "postal-mime": "^4.0.4"
   },
   "devDependencies": {
     "@types/node": "^26.6.4",
