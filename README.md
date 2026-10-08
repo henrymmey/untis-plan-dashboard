@@ -1,9 +1,9 @@
-# untis-to-api
+# untis-plan-dashboard
 
-[![CI](https://github.com/henrymmey/untis-to-api/actions/workflows/ci.yml/badge.svg)](https://github.com/henrymmey/untis-to-api/actions/workflows/ci.yml)
-[![License](https://img.shields.io/github/license/henrymmey/untis-to-api)](LICENSE)
+[![CI](https://github.com/henrymmey/untis-plan-dashboard/actions/workflows/ci.yml/badge.svg)](https://github.com/henrymmey/untis-plan-dashboard/actions/workflows/ci.yml)
+[![License](https://img.shields.io/github/license/henrymmey/untis-plan-dashboard)](LICENSE)
 
-**untis-to-api** turns IServ/Untis substitution-plan emails into structured data and serves it through an authenticated JSON API and a web dashboard.
+**untis-plan-dashboard** turns IServ/Untis substitution-plan emails into structured data and serves it through an authenticated JSON API and a web dashboard.
 
 The application is built for Cloudflare Workers and uses Cloudflare D1 for structured data and Cloudflare R2 for the original PDF files.
 
@@ -137,8 +137,8 @@ The production configuration is Cloudflare-specific, but the parser and applicat
 Clone the repository and install the dependencies:
 
 ```bash
-git clone https://github.com/henrymmey/untis-to-api.git
-cd untis-to-api
+git clone https://github.com/henrymmey/untis-plan-dashboard.git
+cd untis-plan-dashboard
 npm ci
 ```
 
