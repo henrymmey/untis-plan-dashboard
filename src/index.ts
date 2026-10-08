@@ -1,7 +1,11 @@
 import { extractText, getDocumentProxy } from "unpdf";
 import PostalMime from "postal-mime";
 import { parsePlanText } from "./parser";
+import { handleDashboard } from "./dashboard";
 import type { Env } from "./types";
+
+const API_HOST = "api.grueneeule.de";
+const DASHBOARD_HOST = "obs.henrymeyer.de";
 
 const json = (data: unknown, status = 200, extra: HeadersInit = {}) =>
   new Response(JSON.stringify(data, null, 2), {
@@ -177,17 +181,34 @@ async function handleApi(request: Request, env: Env): Promise<Response> {
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
-    if (request.method !== "GET") return errorJson("Method not allowed.", 405);
-    try {
-      return await handleApi(request, env);
-    } catch (error) {
-      console.error(error);
-      return errorJson(
-        error instanceof Error ? error.message : "Internal server error.",
-        500,
-      );
+    const host = new URL(request.url).hostname.toLowerCase();
+
+    if (host === API_HOST) {
+      if (request.method !== "GET") return errorJson("Method not allowed.", 405);
+      try {
+        return await handleApi(request, env);
+      } catch (error) {
+        console.error(error);
+        return errorJson(
+          error instanceof Error ? error.message : "Internal server error.",
+          500,
+        );
+      }
     }
+
+    if (host === DASHBOARD_HOST) {
+      if (request.method !== "GET") return errorJson("Method not allowed.", 405);
+      try {
+        return await handleDashboard(request, env);
+      } catch (error) {
+        console.error(error);
+        return new Response("Internal server error.", { status: 500 });
+      }
+    }
+
+    return errorJson("Host not configured.", 404);
   },
+
   async email(message: ForwardableEmailMessage, env: Env): Promise<void> {
     try {
       await processEmail(message, env);
