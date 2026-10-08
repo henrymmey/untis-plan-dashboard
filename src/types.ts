@@ -1,8 +1,21 @@
+export interface EmailSender {
+  send(message: {
+    to: string;
+    from: string;
+    subject: string;
+    text?: string;
+    html?: string;
+  }): Promise<{ messageId: string }>;
+}
+
 export interface Env {
   DB: D1Database;
   PDF_BUCKET: R2Bucket;
+  EMAIL: EmailSender;
   ALLOWED_SENDER: string;
-  TARGET_CLASS: string;
+  ISERV_DOMAIN: string;
+  EMAIL_FROM: string;
+  DEFAULT_CLASS: string;
   API_KEY: string;
 }
 
