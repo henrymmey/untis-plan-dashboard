@@ -1,560 +1,549 @@
 # untis-to-api
 
-Automatisiert den Vertretungsplan der Example School aus weitergeleiteten IServ-Mails und stellt die Daten als JSON-API bereit.
+[![CI](https://github.com/henrymmey/untis-to-api/actions/workflows/ci.yml/badge.svg)](https://github.com/henrymmey/untis-to-api/actions/workflows/ci.yml)
+[![License](https://img.shields.io/github/license/henrymmey/untis-to-api)](LICENSE)
 
-Die aktuelle Produktivkonfiguration verarbeitet alle unterstützten Klassen; `DEFAULT_CLASS` bleibt für die rückwärtskompatible API-Abkürzung auf `9-G1` gesetzt.
+**untis-to-api** turns IServ/Untis substitution-plan emails into structured data and serves it through an authenticated JSON API and a web dashboard.
 
-## Architektur
+The application is built for Cloudflare Workers and uses Cloudflare D1 for structured data and Cloudflare R2 for the original PDF files.
 
-~~~text
+> **Note:** This repository contains a reusable implementation, but the parser is tailored to the Untis PDF layout used by the target school. Different schools may require parser changes.
+
+## Features
+
+- IServ email forwarding directly into a Cloudflare Worker
+- Trusted-sender validation
+- Automatic PDF attachment detection
+- Untis PDF text extraction with `unpdf`
+- Extraction of plan date and revision/version number from the PDF itself
+- Support for multiple corrected plan versions
+- Extraction of multiple classes from one plan
+- Cloudflare D1 storage for structured plan data
+- Cloudflare R2 storage for original PDFs
+- Authenticated JSON API using a Bearer API key
+- Multi-user web dashboard
+- Email-code authentication
+- Optional MeyerAuth / OIDC authentication for configured users
+- Configurable dashboard access control
+- School-day navigation in the dashboard
+- GitHub Actions CI for type generation and TypeScript checking
+- Manual production deployment
+
+## Architecture
+
+```text
 IServ
-  |
-  | automatische Weiterleitung
-  v
+  │
+  │ automatic forwarding
+  ▼
 Cloudflare Email Routing
-  |
-  v
+  │
+  ▼
 Cloudflare Worker
-  |- Absender prüfen
-  |- E-Mail/MIME parsen
-  |- PDF-Anhang finden
-  |- PDF-Text extrahieren
-  |- Datum + Untis-Version erkennen
-  |- alle unterstützten Klassen extrahieren
-  |- Original-PDF -> R2
-  '- strukturierte Daten -> D1
-          |
-          v
-   JSON API /vertretung/plan/...
-~~~
+  ├── validate sender
+  ├── parse MIME message
+  ├── find PDF attachment
+  ├── extract PDF text
+  ├── detect plan date + version
+  ├── parse supported classes
+  │
+  ├──► Cloudflare D1
+  │      structured plan data
+  │
+  └──► Cloudflare R2
+         original PDF
 
-postal-mime ist für Cloudflare Email Workers geeignet und kann message.raw direkt verarbeiten. pdf-parse unterstützt Cloudflare Workers und die PDFParse-API zur Textextraktion.
+                 ┌─────────────────────┐
+                 │   JSON API           │
+                 │   authenticated      │
+                 └──────────┬──────────┘
+                            │
+                 ┌──────────▼──────────┐
+                 │   Web Dashboard      │
+                 │   session auth       │
+                 └─────────────────────┘
+```
 
-## Warum das Datum aus dem PDF kommt
+## Why the plan date comes from the PDF
 
-Der Empfangstag der Mail ist **nicht** das Plan-Datum.
+The email reception date is not necessarily the date for which the substitution plan applies.
 
-Beim Beispiel-PDF steht:
+For example, a PDF may contain:
 
-~~~text
+```text
 8.10.2026 (2)
 Vertretungsplan Klassen 9.10. / Freitag
-~~~
+```
 
-Daraus wird:
+The parser therefore stores:
 
-~~~text
+```text
 planDate = 2026-10-09
 version  = 2
-~~~
+```
 
-Eine Mail, die am 08.10. eingeht, kann deshalb einen Plan für den 09.10. enthalten.
+This also allows corrected versions of the same plan to coexist.
 
-## API
+## Repository structure
 
-### Neueste Version für 9-G1
+```text
+.
+├── .github/
+│   ├── dependabot.yml
+│   ├── ISSUE_TEMPLATE/
+│   ├── PULL_REQUEST_TEMPLATE.md
+│   └── workflows/
+│       └── ci.yml
+├── migrations/
+│   ├── 0001_initial.sql
+│   ├── 0002_auth.sql
+│   ├── 0003_oidc.sql
+│   ├── 0004_login_challenges.sql
+│   └── 0005_access_control.sql
+├── src/
+│   ├── access.ts
+│   ├── auth.ts
+│   ├── dashboard.ts
+│   ├── index.ts
+│   ├── oidc.ts
+│   ├── parser.ts
+│   ├── smtp.ts
+│   └── types.ts
+├── .env.example
+├── LICENSE
+├── package.json
+├── tsconfig.json
+└── wrangler.jsonc
+```
 
-~~~text
-GET /vertretung/plan/2026-10-09
-~~~
+## Requirements
 
-### Bestimmte Version
-
-~~~text
-GET /vertretung/plan/2026-10-09/2
-~~~
-
-### Bestimmte Version und Klasse
-
-~~~text
-GET /vertretung/plan/2026-10-09/2/9-G1
-~~~
-
-Die erste Variante sucht die höchste vorhandene Version.
-
-## Voraussetzungen
-
-- Node.js 20 oder neuer
+- Node.js 20 or newer
 - npm
-- Cloudflare-Konto
-- Domain, die in Cloudflare verwaltet wird
-- Zugriff auf die IServ-Weiterleitung
+- A Cloudflare account
+- Cloudflare Workers
+- Cloudflare D1
+- Cloudflare R2
+- A domain managed through Cloudflare
+- An IServ installation capable of forwarding the substitution-plan emails
+- An SMTP account for dashboard login codes
+- An OIDC provider if MeyerAuth login is enabled
 
-Für den PDF-Parser ist Cloudflare Workers Paid für den Produktivbetrieb sinnvoll, weil PDF-Verarbeitung CPU-Zeit benötigt. Prüfe vor dem Betrieb die aktuell geltenden Worker-Limits.
+The production configuration is Cloudflare-specific, but the parser and application structure can be adapted to other environments.
 
-## 1. Repository
+## Installation
 
-~~~bash
+Clone the repository and install the dependencies:
+
+```bash
 git clone https://github.com/henrymmey/untis-to-api.git
 cd untis-to-api
-npm install
-~~~
+npm ci
+```
 
-## 2. Cloudflare CLI anmelden
+Generate the Cloudflare Worker types:
 
-~~~bash
-npx wrangler login
-npx wrangler whoami
-~~~
-
-Der Browser öffnet sich. Cloudflare-Zugriff erlauben.
-
-## 3. D1-Datenbank erstellen
-
-~~~bash
-npx wrangler d1 create untis_to_api --location weur --jurisdiction eu
-~~~
-
-Wrangler gibt eine Datenbank-ID zurück.
-
-In wrangler.jsonc die Zeile
-
-~~~json
-"database_id": "DEINE-D1-ID"
-~~~
-
-eintragen.
-
-## 4. R2-Bucket erstellen
-
-~~~bash
-npx wrangler r2 bucket create untis-to-api-pdfs
-~~~
-
-Der Name muss mit dem Bucket in wrangler.jsonc übereinstimmen.
-
-R2 enthält die Original-PDFs und ist nicht öffentlich freigegeben.
-
-## 5. D1-Migration auf Produktion anwenden
-
-~~~bash
-npx wrangler d1 migrations apply untis_to_api --remote
-~~~
-
-Danach:
-
-~~~bash
-npx wrangler d1 migrations list untis_to_api --remote
-~~~
-
-## 6. Domain konfigurieren
-
-In wrangler.jsonc:
-
-~~~json
-"routes": [
-  {
-    "pattern": "domain.de/vertretung/*",
-    "zone_name": "domain.de"
-  }
-]
-~~~
-
-Beide Werte durch deine echte Domain ersetzen.
-
-Beispiel:
-
-~~~json
-"routes": [
-  {
-    "pattern": "api.meinedomain.de/vertretung/*",
-    "zone_name": "meinedomain.de"
-  }
-]
-~~~
-
-Die Zone muss in deinem Cloudflare-Konto liegen.
-
-## 7. Einstellungen
-
-In wrangler.jsonc:
-
-~~~json
-"vars": {
-  "ALLOWED_SENDER": "vertretung@example-school.de",
-  "TARGET_CLASS": "9-G1"
-}
-~~~
-
-ALLOWED_SENDER verhindert, dass beliebige Personen PDFs einschleusen.
-
-DEFAULT_CLASS bestimmt die Klasse für API-Aufrufe ohne explizite Klassenangabe.
-
-## 8. Worker deployen
-
-~~~bash
-npm run deploy
-~~~
-
-## 9. Cloudflare Email Routing
-
-Im Cloudflare Dashboard deine Domain auswählen und zu **Email → Email Routing** gehen.
-
-Email Routing für die Domain aktivieren.
-
-Eine Adresse anlegen, beispielsweise:
-
-~~~text
-vertretung@deinedomain.de
-~~~
-
-Die eingehende Route muss an den Worker **untis-to-api** übergeben werden.
-
-Du brauchst für diese Adresse keine normale Mailbox. Die Mail geht direkt an den Email-Handler des Workers.
-
-## 10. IServ einrichten
-
-In IServ die automatische Weiterleitung einrichten:
-
-~~~text
-vertretung@example-school.de
-        |
-        v
-vertretung@deinedomain.de
-~~~
-
-Der Worker prüft den SMTP/envelope sender und zusätzlich den From-Header, soweit vorhanden.
-
-## 11. Erste Testmail
-
-Schicke einen echten Vertretungsplan durch die Weiterleitung.
-
-Logs beobachten:
-
-~~~bash
-npx wrangler tail untis-to-api
-~~~
-
-Bei Erfolg erscheint:
-
-~~~text
-Substitution plan processed successfully.
-~~~
-
-## 12. API testen
-
-Angenommen das PDF enthält:
-
-~~~text
-8.10.2026 (2)
-Vertretungsplan Klassen 9.10. / Freitag
-~~~
-
-Dann:
-
-~~~bash
-curl https://deinedomain.de/vertretung/plan/2026-10-09/2
-~~~
-
-## 13. Mehrere Versionen
-
-Untis kann beispielsweise senden:
-
-~~~text
-8.10.2026 (1)
-8.10.2026 (2)
-8.10.2026 (3)
-8.10.2026 (4)
-~~~
-
-Alle werden getrennt gespeichert:
-
-~~~text
-/vertretung/plan/2026-10-09/1
-/vertretung/plan/2026-10-09/2
-/vertretung/plan/2026-10-09/3
-/vertretung/plan/2026-10-09/4
-~~~
-
-/vertretung/plan/2026-10-09 liefert automatisch Version 4.
-
-## 14. D1 kontrollieren
-
-~~~bash
-npx wrangler d1 execute untis_to_api --remote --command "SELECT plan_date, version, class_name, source_filename FROM plans ORDER BY plan_date DESC, version DESC;"
-~~~
-
-## 15. R2 kontrollieren
-
-~~~bash
-npx wrangler r2 bucket list
-~~~
-
-Objekte werden ungefähr so abgelegt:
-
-~~~text
-plans/
-  2026-10-09/
-    2/
-      9-G1/
-        source.pdf
-~~~
-
-## 16. Lokale Entwicklung
-
-~~~bash
+```bash
 npm run types
+```
+
+Check the TypeScript project:
+
+```bash
 npm run typecheck
-npm run db:migrate:local
+```
+
+Start the local development server:
+
+```bash
 npm run dev
-~~~
+```
 
-Die lokale D1-Datenbank ist von der Produktion getrennt.
+## Cloudflare configuration
 
-## 17. Code ändern und deployen
+The production Worker is configured through `wrangler.jsonc`.
 
-~~~bash
-git add .
-git commit -m "Update parser"
-git push
-npm run deploy
-~~~
+At minimum, the deployment requires:
 
-Ein GitHub-Push allein deployed noch nicht nach Cloudflare. Später kann GitHub Actions das automatisch übernehmen.
+- a D1 database;
+- an R2 bucket;
+- a Worker custom domain or route;
+- the required public configuration values;
+- the required Worker secrets.
 
-## 18. Parser
+Create a D1 database with Wrangler:
 
-Der Parser sucht im PDF insbesondere nach:
+```bash
+npx wrangler d1 create untis_to_api --location weur --jurisdiction eu
+```
 
-- DD.MM.YYYY (Version)
-- Vertretungsplan Klassen DD.MM. / Wochentag
-- Zeilen für die konfigurierte Klasse
-- Entfall
-- Freisetzung
-- Vertretung
-- Betreuung
-- Statt-Vertretung
-- Raum-Vtr.
+Create the R2 bucket:
 
-Die aktuelle Logik ist an die vorliegende Untis-Struktur angepasst und speichert alle erkannten Klassen. Wenn die Schule das PDF-Layout ändert, muss der Parser mit einem neuen Beispiel getestet werden.
+```bash
+npx wrangler r2 bucket create untis-to-api-pdfs
+```
 
-## 19. Warum R2 und D1?
+Update the D1 database ID and other environment-specific values in `wrangler.jsonc`.
 
-R2 speichert das unveränderte Original-PDF.
+Do not copy production credentials into the repository.
 
-D1 speichert die bereits extrahierten JSON-Daten.
+## Environment variables and secrets
 
-Dadurch muss ein API-Aufruf nicht erneut das PDF parsen.
+Non-sensitive configuration can be defined in `wrangler.jsonc`.
 
-## 20. Datenschutz
+Sensitive values must be stored as Cloudflare Worker secrets.
 
-Die API kann öffentlich sein, die Original-PDFs bleiben privat im R2-Bucket.
+### Worker secrets
 
-Prüfe vor einer öffentlichen Weitergabe, ob die Schule die Veröffentlichung der Vertretungsplandaten erlaubt.
+The application uses secrets including:
 
-## 21. Nächste sinnvolle Erweiterungen
+```text
+API_KEY
+SMTP_PASSWORD
+TURNSTILE_SECRET
+OIDC_CLIENT_SECRET
+```
 
-- automatische GitHub-Actions-Deployments
-- mehrere Klassen
-- OpenAPI-Spezifikation
-- /vertretung/today
-- /vertretung/latest
-- iCal
-- Discord-Bot
-- Parser-Tests mit mehreren echten PDFs
-- Monitoring bei ausbleibenden Plänen
-- bessere Erkennung verschiedener Untis-PDF-Layouts
-
-
-## 22. Optional: automatisches Deployment über GitHub Actions
-
-Im Repository liegt bereits .github/workflows/deploy.yml.
-
-Damit jeder Push auf main automatisch nach Cloudflare deployed wird:
-
-1. Cloudflare Dashboard öffnen.
-2. Einen API Token mit den für Workers benötigten Berechtigungen erstellen.
-3. In GitHub zu Settings → Secrets and variables → Actions gehen.
-4. Zwei Repository-Secrets anlegen:
-   - CLOUDFLARE_API_TOKEN
-   - CLOUDFLARE_ACCOUNT_ID
-5. Danach:
-
-~~~bash
-git add .
-git commit -m "Enable automatic deployment"
-git push
-~~~
-
-GitHub Actions installiert die Abhängigkeiten, erzeugt die Worker-Typen, führt den Typecheck aus und deployt anschließend.
-
-Wenn du das automatische Deployment nicht möchtest, kannst du .github/workflows/deploy.yml löschen und weiterhin manuell mit npm run deploy arbeiten.
-
-## 23. Fehlerdiagnose
-
-### Mail kommt nicht an
-
-Prüfen:
-
-- Cloudflare Email Routing ist für die Domain aktiviert.
-- Die Empfangsadresse existiert.
-- Die Route zeigt auf untis-to-api.
-- IServ leitet tatsächlich weiter.
-- Im Cloudflare Email-Routing-Log ist die Mail sichtbar.
-- npx wrangler tail untis-to-api zeigt keinen Reject.
-
-### PDF wird nicht erkannt
-
-Prüfen:
-
-- Die Mail enthält wirklich einen PDF-Anhang.
-- Die PDF ist textbasiert und nicht nur ein Scan.
-- Im PDF steht die Klasse als K 9-G1.
-- Im PDF steht die Untis-Version im Format DD.MM.YYYY (N).
-- Im PDF steht die Überschrift Vertretungsplan Klassen DD.MM. / ...
-
-### Falsches Datum
-
-Der Parser nimmt bewusst nicht den Mail-Empfangstag. Wenn das PDF ein anderes Datumsformat verwendet, muss findPlanDate in src/parser.ts angepasst werden.
-
-### CPU-Fehler
-
-PDF-Parsing ist der teuerste Teil. Wenn der Worker wegen CPU-Limits abbricht, zuerst den Cloudflare-Tarif und die aktuelle Worker-Limit-Dokumentation prüfen. Bei größeren PDFs sollte die Architektur ggf. auf eine asynchrone Verarbeitung über eine Queue erweitert werden.
-
-
-## API authentication
-
-The plan API requires a Bearer API key. The key is stored as a Cloudflare Worker Secret and must not be committed to Git.
-
-Set it once from the repository root:
+Set a secret with Wrangler:
 
 ```bash
 npx wrangler secret put API_KEY
 ```
 
-Enter a long random value when Wrangler asks for it. After that, API requests must include:
+Repeat this for the other required secrets.
+
+### Public configuration
+
+Depending on the deployment, `wrangler.jsonc` can contain values such as:
+
+```text
+ALLOWED_SENDER
+ISERV_DOMAIN
+EMAIL_FROM
+SMTP_HOST
+SMTP_PORT
+SMTP_SECURITY
+SMTP_USERNAME
+TURNSTILE_SITEKEY
+OIDC_ISSUER
+OIDC_CLIENT_ID
+OIDC_REDIRECT_URI
+DEFAULT_CLASS
+```
+
+Only values that are safe to expose should be placed in `vars`.
+
+## Database migrations
+
+Apply migrations locally:
+
+```bash
+npm run db:migrate:local
+```
+
+Apply migrations to production:
+
+```bash
+npm run db:migrate:remote
+```
+
+List production migrations:
+
+```bash
+npx wrangler d1 migrations list untis_to_api --remote
+```
+
+Production migrations are intentionally **not** applied automatically by GitHub Actions.
+
+## Email ingestion
+
+The Worker expects the substitution plan to arrive through an email route.
+
+A typical flow is:
+
+```text
+IServ
+  │
+  ▼
+vertretung@api.example.com
+  │
+  ▼
+Cloudflare Email Worker
+  │
+  ├── sender validation
+  ├── MIME parsing
+  ├── PDF detection
+  └── PDF parsing
+```
+
+The configured trusted senders are controlled through `ALLOWED_SENDER`.
+
+The Worker should reject mail from untrusted senders before processing the attachment.
+
+## PDF parsing
+
+The parser in `src/parser.ts` is designed around the Untis substitution-plan format used by the target deployment.
+
+It recognizes information such as:
+
+- plan date;
+- plan version;
+- class sections;
+- substitutions;
+- cancellations;
+- releases;
+- supervision;
+- room substitutions;
+- room notes;
+- replacement substitutions.
+
+The parser deliberately extracts the plan date from the PDF rather than trusting the email timestamp.
+
+If the school changes its Untis PDF layout, the parser may need to be updated.
+
+## Storage
+
+### D1
+
+Cloudflare D1 stores the structured representation of the plans, authentication state, sessions, login challenges, OIDC state, and dashboard access configuration.
+
+### R2
+
+Cloudflare R2 stores the original PDF files.
+
+The original PDFs should not be made publicly accessible unless the deployment explicitly requires it.
+
+Keeping the original PDFs separate from the API data means API requests do not need to parse the source PDF again.
+
+## API
+
+The API is protected by a Bearer API key.
+
+### Latest version
 
 ```http
+GET /vertretung/plan/2026-10-09
 Authorization: Bearer YOUR_API_KEY
 ```
 
-Example:
+Without an explicit version, the API returns the highest available version for the requested date.
 
-```bash
-curl -H "Authorization: Bearer YOUR_API_KEY" https://api.grueneeule.de/vertretung/plan/2026-10-09
+### Specific version
+
+```http
+GET /vertretung/plan/2026-10-09/2
+Authorization: Bearer YOUR_API_KEY
 ```
 
-Requests without the correct key receive HTTP 401. API responses use `Cache-Control: no-store` so authenticated plan data is not publicly cached.
+### Specific class
 
+```http
+GET /vertretung/plan/2026-10-09/2/9-G1
+Authorization: Bearer YOUR_API_KEY
+```
 
-## Mehrbenutzer-Dashboard
+Example with curl:
 
-Das Dashboard auf `obs.henrymeyer.de` verwendet eine eigene E-Mail-Code-Anmeldung.
+```bash
+curl \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  https://api.example.com/vertretung/plan/2026-10-09
+```
 
-Ablauf:
+Requests without the correct API key receive HTTP 401.
 
-1. Der Nutzer gibt nur den Benutzernamen vor dem `@` ein, z. B. `henry.meyer`.
-2. Der Worker ergänzt automatisch `@obs-hagen-atw.de`.
-3. Ein sechsstelliger Einmalcode wird an die IServ-Adresse gesendet.
-4. Nach erfolgreicher Anmeldung wählt der Nutzer seine Klasse aus.
-5. Das Dashboard zeigt anschließend immer den Plan dieser Klasse.
-6. Unter **Einstellungen** kann die Klasse jederzeit geändert werden.
+API responses use `Cache-Control: no-store` so authenticated plan data is not publicly cached.
 
-Unterstützte Auswahl:
+## Web dashboard
 
-- Klassenstufe 5 bis 10
-- Gymnasium (G)
-- Oberschule (O)
-- Realschule (R)
-- Hauptschule (H)
-- Klassennummer frei als Zahl
+The project also includes a web dashboard.
 
-Die Klassen werden bewusst nicht serverseitig gegen eine Klassenliste geprüft. Der Nutzer darf eine andere Klasse auswählen und sieht dann deren Plan.
+The dashboard provides:
 
-### Zentrale Plan-Einspeisung
+- login via one-time email code;
+- optional OIDC/MeyerAuth login;
+- class selection;
+- access control;
+- previous/next school-day navigation;
+- a direct `Heute` action;
+- settings and logout;
+- class-specific substitution-plan display.
 
-Nur der Betreiber muss den IServ-Vertretungsplan einmalig weiterleiten:
+The login flow accepts an IServ username and derives the corresponding IServ email address from the configured `ISERV_DOMAIN`.
 
-~~~text
-IServ Vertretungsplan
-        |
-        v
-vertretung@api.grueneeule.de
-        |
-        v
-Cloudflare Worker
-        |
-        +--> alle erkannten Klassen -> D1
-        +--> Original-PDF -> R2
-~~~
+### Email-code authentication
 
-Andere Nutzer müssen keine Mailweiterleitung einrichten.
+The Worker generates a short-lived one-time code and sends it through the configured SMTP server.
 
-### Outbound E-Mail
+Codes and sessions are stored server-side in D1. Login attempts are rate-limited.
 
-Die Login-Codes werden **nicht über Cloudflare Email Sending** verschickt.
+### OIDC / MeyerAuth
 
-Der Worker verbindet sich direkt per SMTP mit dem separaten Mailpostfach:
+OIDC is optional and intended for specifically configured accounts.
 
-`noreply.homelab@henrymeyer.de`
+The callback uses authorization code flow with PKCE. The OIDC provider, client ID, client secret, and redirect URI are configured through Worker variables/secrets.
 
-Cloudflare Workers unterstützt dafür ausgehende TCP-Verbindungen über `cloudflare:sockets`; SMTP über Port 465 (TLS) oder 587 (STARTTLS) kann damit direkt angesprochen werden. Port 25 ist aus Workers gesperrt. citeturn0search0
+## Dashboard access control
 
-Die SMTP-Zugangsdaten werden nicht ins Repository geschrieben:
+The dashboard can be configured to:
 
-~~~bash
-npx wrangler secret put SMTP_PASSWORD
-~~~
+- allow everyone with a valid account; or
+- allow only explicitly configured usernames.
 
-In `wrangler.jsonc` müssen außerdem der echte SMTP-Server, Port, Sicherheitsmodus und Benutzername eingetragen werden:
+The administrator can manage this setting through the dashboard's admin interface.
 
-~~~text
+The administrator account is handled separately from the configurable allowlist.
+
+## SMTP
+
+Login codes are sent through an external SMTP server.
+
+Supported modes are:
+
+- TLS on port 465;
+- STARTTLS on port 587.
+
+The SMTP password must never be committed to Git.
+
+Configure the connection through:
+
+```text
 SMTP_HOST
 SMTP_PORT
 SMTP_SECURITY
 SMTP_USERNAME
 SMTP_PASSWORD
-~~~
+EMAIL_FROM
+```
 
-Beispiel für einen Server mit SMTPS:
+## Turnstile
 
-~~~text
-SMTP_HOST=smtp.dein-mailanbieter.de
-SMTP_PORT=465
-SMTP_SECURITY=tls
-SMTP_USERNAME=noreply.homelab@henrymeyer.de
-~~~
+The login page can use Cloudflare Turnstile to reduce automated abuse.
 
-Für einen Server mit STARTTLS:
+The site key is public configuration. The Turnstile secret must be stored as a Worker secret.
 
-~~~text
-SMTP_PORT=587
-SMTP_SECURITY=starttls
-~~~
+The server validates the token, hostname, and configured action before creating a login challenge.
 
-Der SMTP-Server muss natürlich externe SMTP-Verbindungen von Cloudflare Workers akzeptieren. Der Login-Code wird ausschließlich über diese Verbindung versendet.
+## Local development
 
-### D1-Migration
+Run:
 
-Nach dem Deploy der neuen Version muss die Auth-Migration einmalig auf Produktion angewendet werden:
+```bash
+npm ci
+npm run types
+npm run typecheck
+npm run db:migrate:local
+npm run dev
+```
 
-~~~bash
-npx wrangler d1 migrations apply untis_to_api --remote
-~~~
+Local D1 storage is separate from the production database.
 
-Danach existieren die Tabellen:
+Avoid using real school, student, staff, authentication, or production email data during local development.
 
-~~~text
-users
-login_codes
-sessions
-plans
-~~~
+## Continuous integration
 
-### API
+GitHub Actions runs CI for pushes to `main` and for pull requests.
 
-Die bisherige API bleibt erhalten. Ohne Klassenangabe verwendet sie weiterhin `DEFAULT_CLASS`, aktuell `9-G1`.
+The CI workflow:
 
-Für eine andere Klasse:
+1. checks out the repository;
+2. installs the exact locked dependency versions with `npm ci`;
+3. generates Cloudflare Worker types;
+4. runs the TypeScript type checker.
 
-~~~text
-GET /vertretung/plan/2026-10-09/2/9-G2
-~~~
+CI does **not**:
 
-Für eine bestimmte Version:
+- deploy the Worker;
+- modify production D1;
+- access production secrets;
+- send emails;
+- modify the production R2 bucket.
 
-~~~text
-GET /vertretung/plan/2026-10-09/2/9-G2
-~~~
+## Production deployment
 
-Die API bleibt über den Bearer-API-Key geschützt. Das Web-Dashboard verwendet dagegen die E-Mail-Code-Session und benötigt keinen API-Key.
+Production deployment is intentionally **manual**.
+
+After reviewing a change, run the checks locally:
+
+```bash
+npm ci
+npm run types
+npm run typecheck
+```
+
+Apply any required production database migrations:
+
+```npm run db:migrate:remote```
+
+Then deploy the Worker:
+
+```bash
+npm run deploy
+```
+
+A typical manual deployment sequence is:
+
+```bash
+git pull
+npm ci
+npm run types
+npm run typecheck
+npm run db:migrate:remote
+npm run deploy
+```
+
+Do not run production migrations blindly. Review the migration files and deployment impact first.
+
+## Monitoring
+
+For live Worker logs:
+
+```bash
+npx wrangler tail untis-to-api
+```
+
+When troubleshooting email ingestion, check:
+
+- Cloudflare Email Routing;
+- the Worker logs;
+- sender validation;
+- the presence of a PDF attachment;
+- PDF text extraction;
+- the detected plan date and version;
+- D1 records;
+- R2 objects.
+
+## Privacy
+
+Substitution plans may contain information relating to students, teachers, classes, rooms, and schedules.
+
+Before deploying or publicly exposing this application, verify that the intended publication and retention of this information is permitted by the relevant school and organizational policies.
+
+Recommended practices:
+
+- keep original PDFs private in R2;
+- do not commit real PDFs to Git;
+- do not include real authentication data in issues or pull requests;
+- use Worker secrets for credentials;
+- avoid unnecessary logging of personal information;
+- restrict dashboard access when public access is not required.
+
+## Security
+
+Please read [SECURITY.md](SECURITY.md) before reporting a security issue.
+
+Never commit credentials or production secrets to this repository.
+
+## Contributing
+
+Contributions are welcome.
+
+Please read [CONTRIBUTING.md](CONTRIBUTING.md) before opening an issue or pull request.
+
+GitHub issue forms are provided for bug reports and feature requests.
+
+## License
+
+This project is licensed under the [MIT License](LICENSE).
+
+Copyright © 2026 Henry Meyer.
