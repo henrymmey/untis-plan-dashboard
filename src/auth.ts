@@ -218,7 +218,9 @@ export async function verifyLoginCode(
 
   await env.DB.prepare("UPDATE login_codes SET used = 1 WHERE id = ?").bind(row.id).run();
 
-  const session = await createSessionForEmail(env, normalizedEmail);\n\n
+  const session = await createSessionForEmail(env, normalizedEmail);
+
+  return session;
 }
 
 export async function getSession(request: Request, env: Env): Promise<{ token: string; user: SessionUser } | null> {
