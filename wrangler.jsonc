@@ -26,6 +26,7 @@
     "SMTP_PORT": "465",
     "SMTP_SECURITY": "tls",
     "SMTP_USERNAME": "noreply.homelab@henrymeyer.de"
+    "TURNSTILE_SITEKEY": "0x4AAAAAAFRmuXDndka5BrhJ"
   },
   "routes": [
     {
