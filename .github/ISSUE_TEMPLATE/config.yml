@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/henrymmey/untis-to-api/security/advisories/new
+    about: Please report security vulnerabilities privately instead of opening a public issue.
+  - name: Documentation and contribution guide
+    url: https://github.com/henrymmey/untis-to-api/blob/main/CONTRIBUTING.md
+    about: Read the contribution guidelines before opening an issue or pull request.
