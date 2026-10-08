@@ -8,7 +8,7 @@ const json = (data: unknown, status = 200, extra: HeadersInit = {}) =>
     status,
     headers: {
       "content-type": "application/json; charset=utf-8",
-      "cache-control": "public, max-age=60, s-maxage=300",
+      "cache-control": "no-store",
       ...extra,
     },
   });
@@ -132,6 +132,15 @@ async function processEmail(
 }
 
 async function handleApi(request: Request, env: Env): Promise<Response> {
+  const authorization = request.headers.get("Authorization");
+  const expected = `Bearer ${env.API_KEY}`;
+
+  if (!env.API_KEY || authorization !== expected) {
+    return errorJson("Unauthorized.", 401, {
+      "WWW-Authenticate": 'Bearer realm="untis-to-api"',
+    });
+  }
+
   const parts = pathParts(new URL(request.url));
   if (parts[0] !== "vertretung" || parts[1] !== "plan")
     return errorJson("Not found.", 404);
