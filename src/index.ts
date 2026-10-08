@@ -1,5 +1,4 @@
-import { CanvasFactory } from "pdf-parse/worker";
-import { PDFParse } from "pdf-parse";
+import { extractText, getDocumentProxy } from "unpdf";
 import PostalMime from "postal-mime";
 import { parsePlanText } from "./parser";
 import type { Env } from "./types";
@@ -18,12 +17,9 @@ const errorJson = (message: string, status = 500) => json({ error: message }, st
 const pathParts = (url: URL) => url.pathname.split("/").filter(Boolean);
 
 async function parsePdf(pdf: Uint8Array): Promise<string> {
-  const parser = new PDFParse({ data: pdf, CanvasFactory });
-  try {
-    return (await parser.getText()).text;
-  } finally {
-    await parser.destroy();
-  }
+  const document = await getDocumentProxy(pdf);
+  const { text } = await extractText(document, { mergePages: true });
+  return text;
 }
 
 async function savePlan(
