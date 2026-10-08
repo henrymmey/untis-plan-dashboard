@@ -17,7 +17,7 @@
     },
   ],
   "vars": {
-    "ALLOWED_SENDER": "vertretung@obs-hagen-atw.de",
+    "ALLOWED_SENDER": "vertretung@obs-hagen-atw.de,henry.meyer@obs-hagen-atw.de,philip.cummins@obs-hagen-atw.de",
     "TARGET_CLASS": "9-G1",
   },
   "routes": [
