@@ -1,13 +1,13 @@
 # untis-to-api
 
-Automatisiert den Vertretungsplan der Example School aus weitergeleiteten school mail system-Mails und stellt die Daten als JSON-API bereit.
+Automatisiert den Vertretungsplan der Example School aus weitergeleiteten IServ-Mails und stellt die Daten als JSON-API bereit.
 
 Die aktuelle Konfiguration ist auf **9-G1** und **vertretung@example-school.de** ausgelegt.
 
 ## Architektur
 
 ~~~text
-school mail system
+IServ
   |
   | automatische Weiterleitung
   v
@@ -78,7 +78,7 @@ Die erste Variante sucht die höchste vorhandene Version.
 - npm
 - Cloudflare-Konto
 - Domain, die in Cloudflare verwaltet wird
-- Zugriff auf die school mail system-Weiterleitung
+- Zugriff auf die IServ-Weiterleitung
 
 Für den PDF-Parser ist Cloudflare Workers Paid für den Produktivbetrieb sinnvoll, weil PDF-Verarbeitung CPU-Zeit benötigt. Prüfe vor dem Betrieb die aktuell geltenden Worker-Limits.
 
@@ -202,9 +202,9 @@ Die eingehende Route muss an den Worker **untis-to-api** übergeben werden.
 
 Du brauchst für diese Adresse keine normale Mailbox. Die Mail geht direkt an den Email-Handler des Workers.
 
-## 10. school mail system einrichten
+## 10. IServ einrichten
 
-In school mail system die automatische Weiterleitung einrichten:
+In IServ die automatische Weiterleitung einrichten:
 
 ~~~text
 vertretung@example-school.de
@@ -389,7 +389,7 @@ Prüfen:
 - Cloudflare Email Routing ist für die Domain aktiviert.
 - Die Empfangsadresse existiert.
 - Die Route zeigt auf untis-to-api.
-- school mail system leitet tatsächlich weiter.
+- IServ leitet tatsächlich weiter.
 - Im Cloudflare Email-Routing-Log ist die Mail sichtbar.
 - npx wrangler tail untis-to-api zeigt keinen Reject.
 
