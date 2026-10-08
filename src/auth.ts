@@ -1,4 +1,5 @@
 import type { Env } from "./types";
+import { sendSmtpMail } from "./smtp";
 
 const SESSION_DAYS = 30;
 const CODE_MINUTES = 10;
@@ -110,7 +111,7 @@ export async function requestLoginCode(
   if (!inserted?.id) throw new Error("Login-Code konnte nicht erstellt werden.");
 
   try {
-    await env.EMAIL.send({
+    await sendSmtpMail(env, {
       to: email,
       from: env.EMAIL_FROM,
       subject: "Dein Vertretungsplan – Anmeldecode",
