@@ -159,7 +159,7 @@ export async function consumeLoginChallenge(env: Env, token: string, email: stri
 
 export async function createSessionForEmail(env: Env, email: string): Promise<{ sessionToken: string; user: SessionUser }> {
   const normalizedEmail = email.trim().toLowerCase();
-  if (!/^[^@\\s]+@[^@\\s]+$/.test(normalizedEmail)) throw new Error("Ungültige E-Mail-Adresse.");
+  if (!/^[^@\s]+@[^@\s]+$/.test(normalizedEmail)) throw new Error("Ungültige E-Mail-Adresse.");
 
   const existing = await env.DB.prepare(
     "SELECT id, email, class_name AS className FROM users WHERE email = ? LIMIT 1",
