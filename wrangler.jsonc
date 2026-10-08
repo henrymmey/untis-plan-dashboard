@@ -7,23 +7,27 @@
       "binding": "DB",
       "database_name": "untis_to_api",
       "database_id": "f0b9a90f-8c89-427e-b1aa-f14323c08f93",
-      "migrations_dir": "migrations",
-    },
+      "migrations_dir": "migrations"
+    }
   ],
   "r2_buckets": [
     {
       "binding": "PDF_BUCKET",
-      "bucket_name": "untis-to-api-pdfs",
-    },
+      "bucket_name": "untis-to-api-pdfs"
+    }
   ],
   "vars": {
     "ALLOWED_SENDER": "vertretung@obs-hagen-atw.de,henry.meyer@obs-hagen-atw.de,philip.cummins@obs-hagen-atw.de",
-    "TARGET_CLASS": "9-G1",
+    "TARGET_CLASS": "9-G1"
   },
   "routes": [
     {
       "pattern": "api.grueneeule.de",
-      "custom_domain": true,
+      "custom_domain": true
     },
-  ],
+    {
+      "pattern": "obs.henrymeyer.de",
+      "custom_domain": true
+    }
+  ]
 }
