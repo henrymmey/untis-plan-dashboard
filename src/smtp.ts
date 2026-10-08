@@ -8,7 +8,9 @@ function b64(value: string): string {
   return btoa(value);
 }
 
-async function readResponse(reader: ReadableStreamDefaultReader<Uint8Array>): Promise<{ code: number; text: string }> {
+async function readResponse(
+  reader: ReadableStreamDefaultReader<Uint8Array>,
+): Promise<{ code: number; text: string }> {
   let buffer = "";
   while (true) {
     const { value, done } = await reader.read();
@@ -39,7 +41,13 @@ async function command(
   }
 }
 
-function messageText(to: string, from: string, subject: string, text: string, html: string): string {
+function messageText(
+  to: string,
+  from: string,
+  subject: string,
+  text: string,
+  html: string,
+): string {
   const boundary = "=_untis_to_api_" + crypto.randomUUID().replaceAll("-", "");
   const safeText = text.replace(/\r?\n/g, "\r\n").replace(/^\./gm, "..");
   const safeHtml = html.replace(/\r?\n/g, "\r\n").replace(/^\./gm, "..");
@@ -79,21 +87,33 @@ export async function sendSmtpMail(
   const username = env.SMTP_USERNAME;
   const password = env.SMTP_PASSWORD;
 
-  if (!host || !Number.isInteger(port) || port < 1 || port > 65535 || !username || !password) {
+  if (
+    !host ||
+    !Number.isInteger(port) ||
+    port < 1 ||
+    port > 65535 ||
+    !username ||
+    !password
+  ) {
     throw new Error("SMTP configuration is incomplete.");
   }
   if (port === 25) {
     throw new Error("SMTP port 25 is not available from Cloudflare Workers.");
   }
 
-  const security = (env.SMTP_SECURITY || (port === 465 ? "tls" : "starttls")).toLowerCase();
+  const security = (
+    env.SMTP_SECURITY || (port === 465 ? "tls" : "starttls")
+  ).toLowerCase();
   if (security !== "tls" && security !== "starttls") {
     throw new Error("SMTP_SECURITY must be 'tls' or 'starttls'.");
   }
 
   let socket = connect(
     { hostname: host, port },
-    { secureTransport: security === "tls" ? "on" : "starttls" },
+    {
+      allowHalfOpen: false,
+      secureTransport: security === "tls" ? "on" : "starttls",
+    },
   );
 
   await socket.opened;
@@ -115,7 +135,12 @@ export async function sendSmtpMail(
       await command(writer, reader, "EHLO untis-to-api");
     }
 
-    await command(writer, reader, "AUTH PLAIN " + b64("\0" + username + "\0" + password), 235);
+    await command(
+      writer,
+      reader,
+      "AUTH PLAIN " + b64("\0" + username + "\0" + password),
+      235,
+    );
     await command(writer, reader, "MAIL FROM:<" + env.EMAIL_FROM + ">", 250);
     await command(writer, reader, "RCPT TO:<" + message.to + ">", 250);
     await command(writer, reader, "DATA", 354);
