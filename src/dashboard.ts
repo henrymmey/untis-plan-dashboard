@@ -1,160 +1,41 @@
 import type { Env } from "./types";
+import { destroySession, getSession, requestLoginCode, setSessionCookie, clearSessionCookie, updateClass, verifyLoginCode } from "./auth";
 
-type Plan = {
-  date: string;
-  version: number;
-  class: string;
-  reportDate?: string | null;
-  lessons: Array<Record<string, unknown>>;
-};
+type Plan={date:string;version:number;class:string;lessons:Array<Record<string,unknown>>};
 
-function escapeHtml(value: unknown): string {
-  return String(value ?? "")
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#039;");
+const esc=(v:unknown)=>String(v??"").replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;").replaceAll("'","&#039;");
+const cookies=(r:Request)=>Object.fromEntries((r.headers.get("Cookie")??"").split(";").filter(Boolean).map(p=>{const [k,...v]=p.trim().split("=");return [k,decodeURIComponent(v.join("=")||"")]}));
+const redirect=(to:string)=>new Response(null,{status:303,headers:{Location:to,"Cache-Control":"no-store"}});
+const page=(title:string,body:string,status=200,headers:HeadersInit={})=>new Response("<!doctype html><html lang=\"de\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><meta name=\"theme-color\" content=\"#111315\"><title>"+esc(title)+"</title><style>"+css+"</style></head><body><main>"+body+"</main></body></html>",{status,headers:{"content-type":"text/html; charset=utf-8","cache-control":"no-store",...headers}});
+const dateText=(d:string)=>new Intl.DateTimeFormat("de-DE",{weekday:"long",day:"2-digit",month:"2-digit",year:"numeric"}).format(new Date(d+"T12:00:00Z"));
+const addDays=(d:string,n:number)=>{const x=new Date(d+"T12:00:00Z");x.setUTCDate(x.getUTCDate()+n);return x.toISOString().slice(0,10)};
+const errorBox=(e?:string)=>e?'<div class="error">'+esc(e)+"</div>":"";
+
+function login(error?:string){return page("Anmelden · Vertretungsplan",'<section class="auth"><div class="brand">Vertretungsplan</div><h1>Anmelden</h1><p class="muted">Melde dich mit deinem IServ-Konto an. Wir schicken dir einen einmaligen Code per E-Mail.</p>'+errorBox(error)+'<form method="post" action="/login"><label>IServ-Benutzername</label><div class="email"><input name="username" autocomplete="username" autocapitalize="none" spellcheck="false" maxlength="64" required placeholder="henry.meyer"><span>@obs-hagen-atw.de</span></div><button>Weiter</button></form></section>');}
+function code(email:string,error?:string){return page("Code · Vertretungsplan",'<section class="auth"><div class="brand">Vertretungsplan</div><h1>Code eingeben</h1><p class="muted">Der sechsstellige Code wurde an <strong>'+esc(email)+"</strong> geschickt und ist 10 Minuten gültig.</p>"+errorBox(error)+'<form method="post" action="/login/verify"><input type="hidden" name="email" value="'+esc(email)+'"><label>Bestätigungscode</label><input class="code" name="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" minlength="6" maxlength="6" required placeholder="123456"><button>Anmelden</button></form><a class="back" href="/">Andere E-Mail verwenden</a></section>');}
+
+function setup(email:string,error?:string){return page("Klasse auswählen · Vertretungsplan",'<section class="auth"><div class="brand">Vertretungsplan</div><h1>Deine Klasse</h1><p class="muted">Wähle deine Klasse. Du kannst sie später jederzeit ändern.</p>'+errorBox(error)+'<form method="post" action="/setup"><label>Klassenstufe</label><select name="grade">'+[5,6,7,8,9,10].map(n=>'<option value="'+n+'">'+n+"</option>").join("")+'</select><label>Schulform</label><select name="form"><option value="G">Gymnasium (G)</option><option value="O">Oberschule (O)</option><option value="R">Realschule (R)</option><option value="H">Hauptschule (H)</option></select><label>Klassennummer</label><input name="number" inputmode="numeric" pattern="[0-9]+" maxlength="2" required placeholder="1"><button>Klasse speichern</button></form><p class="small">'+esc(email)+"</p></section>");}
+
+function classValue(form:FormData){const grade=String(form.get("grade")??""),type=String(form.get("form")??""),num=String(form.get("number")??"").trim();if(!/^(5|6|7|8|9|10)$/.test(grade)||!/^[GORH]$/.test(type)||!/^[0-9]+$/.test(num)||Number(num)<1||Number(num)>99)throw new Error("Bitte wähle eine gültige Klasse.");return grade+"-"+type+num;}
+
+function settings(email:string,current:string|null,error?:string){const m=current?.match(/^(5|6|7|8|9|10)-([GORH])([0-9]+)$/);const grade=m?.[1]??"5",type=m?.[2]??"G",num=m?.[3]??"1";return page("Einstellungen · Vertretungsplan",'<section class="settings"><div class="top"><a class="back" href="/">← Plan</a><form method="post" action="/logout"><button class="secondary">Abmelden</button></form></div><div class="brand">Einstellungen</div><h1>Deine Klasse</h1><p class="muted">Angemeldet als <strong>'+esc(email)+"</strong></p>"+errorBox(error)+'<form method="post" action="/settings"><label>Klassenstufe</label><select name="grade">'+[5,6,7,8,9,10].map(n=>'<option value="'+n+'" '+(grade===String(n)?"selected":"")+">"+n+"</option>").join("")+'</select><label>Schulform</label><select name="form">'+[["G","Gymnasium (G)"],["O","Oberschule (O)"],["R","Realschule (R)"],["H","Hauptschule (H)"]].map(([v,l])=>'<option value="'+v+'" '+(type===v?"selected":"")+">"+l+"</option>").join("")+'</select><label>Klassennummer</label><input name="number" inputmode="numeric" pattern="[0-9]+" maxlength="2" required value="'+esc(num)+'"><button>Klasse speichern</button></form></section>');}
+
+const lesson=(l:Record<string,unknown>)=>{const v=(...ks:string[])=>ks.map(k=>l[k]).find(x=>x!==undefined&&x!==null&&String(x).trim()) as string|undefined;const p=v("period","lesson","stunde"),s=v("subject","fach"),t=v("teacher","lehrer"),r=v("room","raum"),ty=v("type","art"),tx=v("text","description","beschreibung");return '<article class="lesson"><div class="period">'+esc(p||"–")+'</div><div><strong>'+esc(s||tx||"Vertretung")+"</strong>"+(t?'<span>'+esc(t)+"</span>":"")+(r?'<span>Raum '+esc(r)+"</span>":"")+(ty?'<em>'+esc(ty)+"</em>":"")+"</div></article>"};
+
+async function plan(env:Env,className:string,date:string){const row=await env.DB.prepare("SELECT data_json FROM plans WHERE plan_date = ? AND class_name = ? ORDER BY version DESC LIMIT 1").bind(date,className).first();return row?JSON.parse(String(row.data_json)) as Plan:null;}
+
+async function home(env:Env,className:string,date:string){const p=await plan(env,className,date);const body='<header><div><div class="brand">Vertretungsplan</div><h1>'+esc(className)+'</h1><div class="muted">'+esc(dateText(p?.date??date))+(p?" · Version "+esc(p.version):"")+'</div></div><a class="settings-link" href="/settings">⚙ Einstellungen</a></header><nav><a href="/?date='+esc(addDays(date,-1))+'">← Vorheriger Tag</a><a href="/?date='+esc(addDays(date,1))+'">Nächster Tag →</a></nav><section class="card">'+(p?.lessons?.length?p.lessons.map(lesson).join(""):'<div class="empty">Für '+esc(className)+" ist an diesem Tag kein Plan vorhanden.</div>")+'</section><footer>OBS Hagen · automatisch aus dem Vertretungsplan erstellt</footer>';return page("Vertretungsplan · "+className,body);}
+
+export async function handleDashboard(request:Request,env:Env):Promise<Response>{
+  const url=new URL(request.url);
+  if(request.method==="GET"&&url.pathname==="/"){const s=await getSession(request,env);if(!s)return login();if(!s.user.className)return setup(s.user.email);const d=url.searchParams.get("date");const date=d&&/^\\d{4}-\\d{2}-\\d{2}$/.test(d)?d:new Date().toISOString().slice(0,10);return home(env,s.user.className,date);}
+  if(request.method==="GET"&&url.pathname==="/login/code"){const e=cookies(request)["__Host-login-email"];return e?code(e):redirect("/");}
+  if(request.method==="POST"&&url.pathname==="/login"){try{const f=await request.formData();const r=await requestLoginCode(request,env,String(f.get("username")??""));const x=redirect("/login/code");const h=new Headers(x.headers);h.append("Set-Cookie","__Host-login-email="+encodeURIComponent(r.email)+"; Max-Age=600; Path=/; Secure; HttpOnly; SameSite=Lax");return new Response(x.body,{status:x.status,headers:h});}catch(e){return login(e instanceof Error?e.message:"Anmeldung fehlgeschlagen.");}}
+  if(request.method==="POST"&&url.pathname==="/login/verify"){const f=await request.formData();const e=String(f.get("email")??cookies(request)["__Host-login-email"]??"");try{const r=await verifyLoginCode(env,e,String(f.get("code")??""));const x=setSessionCookie(r.user.className?redirect("/"):redirect("/setup"),r.sessionToken);const h=new Headers(x.headers);h.append("Set-Cookie","__Host-login-email=; Max-Age=0; Path=/; Secure; HttpOnly; SameSite=Lax");return new Response(x.body,{status:x.status,headers:h});}catch(err){return code(e,err instanceof Error?err.message:"Anmeldung fehlgeschlagen.");}}
+  if(request.method==="POST"&&(url.pathname==="/setup"||url.pathname==="/settings")){const s=await getSession(request,env);if(!s)return redirect("/");try{const c=classValue(await request.formData());await updateClass(env,s.user.id,c);return redirect("/");}catch(e){return url.pathname==="/setup"?setup(s.user.email,e instanceof Error?e.message:"Klasse konnte nicht gespeichert werden."):settings(s.user.email,s.user.className,e instanceof Error?e.message:"Klasse konnte nicht gespeichert werden.");}}
+  if(request.method==="GET"&&url.pathname==="/settings"){const s=await getSession(request,env);return s?settings(s.user.email,s.user.className):redirect("/");}
+  if(request.method==="POST"&&url.pathname==="/logout"){await destroySession(request,env);return clearSessionCookie(redirect("/"));}
+  return new Response("Not found.",{status:404});
 }
 
-function formatDate(date: string): string {
-  return new Intl.DateTimeFormat("de-DE", {
-    weekday: "long",
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  }).format(new Date(`${date}T12:00:00Z`));
-}
-
-function lessonValue(lesson: Record<string, unknown>, keys: string[]): string {
-  for (const key of keys) {
-    if (lesson[key] !== undefined && lesson[key] !== null && String(lesson[key]).trim()) {
-      return String(lesson[key]);
-    }
-  }
-  return "";
-}
-
-function renderLesson(lesson: Record<string, unknown>): string {
-  const period = lessonValue(lesson, ["period", "lesson", "stunde"]);
-  const subject = lessonValue(lesson, ["subject", "fach"]);
-  const teacher = lessonValue(lesson, ["teacher", "lehrer"]);
-  const room = lessonValue(lesson, ["room", "raum"]);
-  const type = lessonValue(lesson, ["type", "art"]);
-  const text = lessonValue(lesson, ["text", "description", "beschreibung"]);
-
-  return `
-    <article class="lesson">
-      <div class="period">${escapeHtml(period || "–")}</div>
-      <div class="details">
-        <strong>${escapeHtml(subject || text || "Vertretung")}</strong>
-        ${teacher ? `<span>${escapeHtml(teacher)}</span>` : ""}
-        ${room ? `<span>Raum ${escapeHtml(room)}</span>` : ""}
-        ${type ? `<span class="tag">${escapeHtml(type)}</span>` : ""}
-      </div>
-    </article>
-  `;
-}
-
-async function loadPlan(env: Env, date: string): Promise<Plan | null> {
-  const row = await env.DB.prepare(
-    "SELECT data_json FROM plans WHERE plan_date = ? AND class_name = ? ORDER BY version DESC LIMIT 1",
-  ).bind(date, env.TARGET_CLASS).first();
-
-  if (!row) return null;
-  return JSON.parse(String(row.data_json)) as Plan;
-}
-
-function addDays(date: string, days: number): string {
-  const value = new Date(`${date}T12:00:00Z`);
-  value.setUTCDate(value.getUTCDate() + days);
-  return value.toISOString().slice(0, 10);
-}
-
-function renderPage(plan: Plan | null, date: string): Response {
-  const title = plan
-    ? `${plan.class} · ${formatDate(plan.date)}`
-    : `Kein Plan · ${formatDate(date)}`;
-
-  const lessons = plan?.lessons ?? [];
-
-  const lessonHtml = lessons.length
-    ? lessons.map(renderLesson).join("")
-    : '<div class="empty">Für diesen Tag ist kein Vertretungsplan vorhanden.</div>';
-
-  const html = `<!doctype html>
-<html lang="de">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>${escapeHtml(title)}</title>
-  <style>
-    :root { color-scheme: light dark; font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
-    body { margin: 0; background: #f5f6f8; color: #17181a; }
-    main { max-width: 820px; margin: 0 auto; padding: 32px 18px 56px; }
-    .header { margin-bottom: 22px; }
-    .eyebrow { color: #68707a; font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; }
-    h1 { margin: 5px 0 4px; font-size: clamp(28px, 6vw, 42px); }
-    .meta { color: #68707a; }
-    .nav { display: flex; gap: 10px; margin: 20px 0; }
-    .nav a { flex: 1; text-align: center; padding: 11px 14px; border-radius: 10px; background: white; color: inherit; text-decoration: none; border: 1px solid #e2e5e9; }
-    .card { background: white; border: 1px solid #e2e5e9; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 18px rgba(0,0,0,.04); }
-    .lesson { display: grid; grid-template-columns: 76px 1fr; gap: 12px; padding: 16px 18px; border-bottom: 1px solid #eceef0; }
-    .lesson:last-child { border-bottom: 0; }
-    .period { font-weight: 800; color: #68707a; }
-    .details { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; }
-    .details strong { width: 100%; font-size: 17px; }
-    .details span { color: #68707a; font-size: 14px; }
-    .tag { padding: 3px 8px; border-radius: 999px; background: #eef0f2; }
-    .empty { padding: 32px 20px; color: #68707a; text-align: center; }
-    footer { margin-top: 16px; color: #7a818a; font-size: 13px; text-align: center; }
-    @media (prefers-color-scheme: dark) {
-      body { background: #111315; color: #f3f4f5; }
-      .nav a, .card { background: #191c1f; border-color: #2b3035; }
-      .lesson { border-color: #2b3035; }
-      .meta, .eyebrow, .period, .details span, .empty, footer { color: #9ba3ad; }
-      .tag { background: #2b3035; }
-    }
-  </style>
-</head>
-<body>
-  <main>
-    <header class="header">
-      <div class="eyebrow">Vertretungsplan</div>
-      <h1>${escapeHtml(plan?.class ?? "9-G1")}</h1>
-      <div class="meta">${escapeHtml(formatDate(plan?.date ?? date))}${plan ? ` · Version ${escapeHtml(plan.version)}` : ""}</div>
-    </header>
-
-    <nav class="nav">
-      <a href="/?date=${escapeHtml(addDays(date, -1))}">← Vorheriger Tag</a>
-      <a href="/?date=${escapeHtml(addDays(date, 1))}">Nächster Tag →</a>
-    </nav>
-
-    <section class="card">
-      ${lessonHtml}
-    </section>
-
-    <footer>OBS Hagen · automatisch aus dem Vertretungsplan erstellt</footer>
-  </main>
-</body>
-</html>`;
-
-  return new Response(html, {
-    headers: {
-      "content-type": "text/html; charset=utf-8",
-      "cache-control": "no-store",
-    },
-  });
-}
-
-export async function handleDashboard(request: Request, env: Env): Promise<Response> {
-  const url = new URL(request.url);
-  if (url.pathname !== "/") return new Response("Not found.", { status: 404 });
-  const requestedDate = url.searchParams.get("date");
-  const date = requestedDate && /^\d{4}-\d{2}-\d{2}$/.test(requestedDate)
-    ? requestedDate
-    : new Date().toISOString().slice(0, 10);
-
-  const plan = await loadPlan(env, date);
-  return renderPage(plan, date);
-}
+const css=':root{font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color-scheme:light dark}*{box-sizing:border-box}body{margin:0;background:#f5f6f8;color:#17181a;min-height:100vh}main{max-width:900px;margin:auto;padding:32px 18px 56px}.auth,.settings{max-width:480px;margin:7vh auto 0;background:#fff;border:1px solid #e2e5e9;border-radius:20px;padding:30px;box-shadow:0 8px 30px rgba(0,0,0,.06)}.brand{font-size:13px;font-weight:800;letter-spacing:.09em;text-transform:uppercase;color:#68707a;margin-bottom:8px}h1{margin:0 0 8px;font-size:clamp(28px,6vw,42px)}.muted{color:#68707a;line-height:1.55}.small{color:#68707a;font-size:13px;margin-top:18px}form{display:grid;gap:9px;margin-top:22px}label{font-size:14px;font-weight:700;margin-top:4px}input,select{width:100%;border:1px solid #d8dce1;background:#fff;color:inherit;border-radius:11px;padding:12px 13px;font:inherit}button{border:0;border-radius:11px;padding:12px 16px;background:#17181a;color:#fff;font:inherit;font-weight:750;cursor:pointer;margin-top:8px}.secondary{background:#eef0f2;color:#17181a!important;margin:0}.email{display:flex;border:1px solid #d8dce1;border-radius:11px;overflow:hidden;background:#fff}.email input{border:0;border-radius:0;min-width:0}.email span{display:flex;align-items:center;padding:0 12px;color:#8b929a;background:#f1f3f5;font-size:14px;white-space:nowrap}.code{text-align:center;font-size:24px;letter-spacing:7px}.error{margin-top:16px;padding:12px 14px;border-radius:10px;background:#fff0f0;color:#9b1c1c;border:1px solid #f2caca}.back{color:inherit;text-decoration:none;font-size:14px}header{display:flex;justify-content:space-between;gap:20px;align-items:flex-start;margin-bottom:22px}.settings-link{padding:10px 13px;border:1px solid #e2e5e9;background:#fff;border-radius:11px;color:inherit;text-decoration:none;white-space:nowrap}nav{display:flex;gap:10px;margin:20px 0}nav a{flex:1;text-align:center;padding:12px 14px;border-radius:11px;background:#fff;color:inherit;text-decoration:none;border:1px solid #e2e5e9}.card{background:#fff;border:1px solid #e2e5e9;border-radius:16px;overflow:hidden}.lesson{display:grid;grid-template-columns:70px 1fr;gap:12px;padding:16px 18px;border-bottom:1px solid #eceef0}.lesson:last-child{border:0}.period{font-weight:800;color:#68707a}.lesson strong{display:block;font-size:17px}.lesson span,.lesson em{display:inline-block;color:#68707a;font-size:14px;margin:7px 12px 0 0;font-style:normal}.lesson em{padding:3px 8px;border-radius:999px;background:#eef0f2}.empty{padding:32px 20px;color:#68707a;text-align:center}footer{margin-top:16px;color:#7a818a;font-size:13px;text-align:center}.top{display:flex;justify-content:space-between;align-items:center}.top form{margin:0}@media(max-width:620px){.auth,.settings{margin-top:3vh;padding:22px}.email span{font-size:12px;padding:0 8px}header{flex-direction:column}.settings-link{text-align:center;width:100%}}@media(prefers-color-scheme:dark){body{background:#111315;color:#f3f4f5}.auth,.settings,nav a,.settings-link,.card{background:#191c1f;border-color:#2b3035}.lesson{border-color:#2b3035}.muted,.brand,.period,.lesson span,.empty,footer{color:#9ba3ad}.lesson em{background:#2b3035}.email,input,select{background:#151719;border-color:#343a40}.email span{background:#2b3035;color:#aeb5bd}.error{background:#321b1b;color:#ffb3b3;border-color:#633535}.secondary{background:#2b3035!important}}';
