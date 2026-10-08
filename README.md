@@ -2,7 +2,7 @@
 
 Automatisiert den Vertretungsplan der Example School aus weitergeleiteten school mail system-Mails und stellt die Daten als JSON-API bereit.
 
-Die aktuelle Konfiguration ist auf **9-G1** und **vertretung@example-school.de** ausgelegt.
+Die aktuelle Konfiguration ist auf **9-A** und **vertretung@example-school.de** ausgelegt.
 
 ## Architektur
 
@@ -20,7 +20,7 @@ Cloudflare Worker
   |- PDF-Anhang finden
   |- PDF-Text extrahieren
   |- Datum + Untis-Version erkennen
-  |- 9-G1-Zeilen extrahieren
+  |- 9-A-Zeilen extrahieren
   |- Original-PDF -> R2
   '- strukturierte Daten -> D1
           |
@@ -52,7 +52,7 @@ Eine Mail, die am 08.10. eingeht, kann deshalb einen Plan für den 09.10. enthal
 
 ## API
 
-### Neueste Version für 9-G1
+### Neueste Version für 9-A
 
 ~~~text
 GET /vertretung/plan/2026-10-09
@@ -67,7 +67,7 @@ GET /vertretung/plan/2026-10-09/2
 ### Bestimmte Version und Klasse
 
 ~~~text
-GET /vertretung/plan/2026-10-09/2/9-G1
+GET /vertretung/plan/2026-10-09/2/9-A
 ~~~
 
 Die erste Variante sucht die höchste vorhandene Version.
@@ -172,7 +172,7 @@ In wrangler.jsonc:
 ~~~json
 "vars": {
   "ALLOWED_SENDER": "vertretung@example-school.de",
-  "TARGET_CLASS": "9-G1"
+  "TARGET_CLASS": "9-A"
 }
 ~~~
 
@@ -286,7 +286,7 @@ Objekte werden ungefähr so abgelegt:
 plans/
   2026-10-09/
     2/
-      9-G1/
+      9-A/
         source.pdf
 ~~~
 
@@ -399,7 +399,7 @@ Prüfen:
 
 - Die Mail enthält wirklich einen PDF-Anhang.
 - Die PDF ist textbasiert und nicht nur ein Scan.
-- Im PDF steht die Klasse als K 9-G1.
+- Im PDF steht die Klasse als K 9-A.
 - Im PDF steht die Untis-Version im Format DD.MM.YYYY (N).
 - Im PDF steht die Überschrift Vertretungsplan Klassen DD.MM. / ...
 
