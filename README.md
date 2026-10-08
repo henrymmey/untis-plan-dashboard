@@ -410,3 +410,28 @@ Der Parser nimmt bewusst nicht den Mail-Empfangstag. Wenn das PDF ein anderes Da
 ### CPU-Fehler
 
 PDF-Parsing ist der teuerste Teil. Wenn der Worker wegen CPU-Limits abbricht, zuerst den Cloudflare-Tarif und die aktuelle Worker-Limit-Dokumentation prüfen. Bei größeren PDFs sollte die Architektur ggf. auf eine asynchrone Verarbeitung über eine Queue erweitert werden.
+
+
+## API authentication
+
+The plan API requires a Bearer API key. The key is stored as a Cloudflare Worker Secret and must not be committed to Git.
+
+Set it once from the repository root:
+
+```bash
+npx wrangler secret put API_KEY
+```
+
+Enter a long random value when Wrangler asks for it. After that, API requests must include:
+
+```http
+Authorization: Bearer YOUR_API_KEY
+```
+
+Example:
+
+```bash
+curl -H "Authorization: Bearer YOUR_API_KEY" https://api.grueneeule.de/vertretung/plan/2026-10-09
+```
+
+Requests without the correct key receive HTTP 401. API responses use `Cache-Control: no-store` so authenticated plan data is not publicly cached.
