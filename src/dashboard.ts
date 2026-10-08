@@ -224,7 +224,7 @@ async function home(env: Env, className: string, date: string, email: string) {
     esc(addDays(date, 1)) +
     '">Nächster Tag →</a></nav><section class="card">' +
     (p?.lessons?.length ? p.lessons.map(lesson).join("") : '<div class="empty">Für ' + esc(className) + " ist an diesem Tag kein Plan vorhanden.</div>") +
-    '</section><footer><a href="https://henrymeyer.de/" target="_blank" rel="noopener noreferrer">GitHub Repository · Developed by Henry Meyer</a></footer>';
+    '</section><footer><a href="https://github.com/henrymmey/untis-to-api" target="_blank" rel="noopener noreferrer">GitHub Repository</a> · <a href="https://henrymeyer.de/" target="_blank" rel="noopener noreferrer">Developed by Henry Meyer</a></footer>';
   return page("Vertretungsplan · " + className, body);
 }
 
