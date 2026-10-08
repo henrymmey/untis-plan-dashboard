@@ -149,6 +149,7 @@ function renderPage(plan: Plan | null, date: string): Response {
 
 export async function handleDashboard(request: Request, env: Env): Promise<Response> {
   const url = new URL(request.url);
+  if (url.pathname !== "/") return new Response("Not found.", { status: 404 });
   const requestedDate = url.searchParams.get("date");
   const date = requestedDate && /^\d{4}-\d{2}-\d{2}$/.test(requestedDate)
     ? requestedDate
