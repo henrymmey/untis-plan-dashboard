@@ -1,7 +1,17 @@
 {
+  "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "untis-to-api",
   "main": "src/index.ts",
   "compatibility_date": "2026-10-06",
+  "send_email": [
+    {
+      "name": "EMAIL",
+      "remote": true,
+      "allowed_sender_addresses": [
+        "noreply.homelab@henrymeyer.de"
+      ]
+    }
+  ],
   "d1_databases": [
     {
       "binding": "DB",
@@ -18,7 +28,9 @@
   ],
   "vars": {
     "ALLOWED_SENDER": "vertretung@obs-hagen-atw.de,henry.meyer@obs-hagen-atw.de,philip.cummins@obs-hagen-atw.de",
-    "TARGET_CLASS": "9-G1"
+    "ISERV_DOMAIN": "obs-hagen-atw.de",
+    "EMAIL_FROM": "noreply.homelab@henrymeyer.de",
+    "DEFAULT_CLASS": "9-G1"
   },
   "routes": [
     {
