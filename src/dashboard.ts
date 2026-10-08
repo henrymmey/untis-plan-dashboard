@@ -74,11 +74,8 @@ const addDays = (d: string, n: number) => {
 
 const addSchoolDay = (d: string, direction: 1 | -1) => {
   let next = addDays(d, direction);
-  const weekday = new Date(next + "T12:00:00Z").getUTCDay();
-  while (weekday === 0 || weekday === 6) {
+  while ([0, 6].includes(new Date(next + "T12:00:00Z").getUTCDay())) {
     next = addDays(next, direction);
-    const day = new Date(next + "T12:00:00Z").getUTCDay();
-    if (day !== 0 && day !== 6) break;
   }
   return next;
 };
