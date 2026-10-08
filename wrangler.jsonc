@@ -19,7 +19,7 @@
   ],
   "vars": {
     "ALLOWED_SENDER": "vertretung@example-school.de",
-    "TARGET_CLASS": "9-G1"
+    "TARGET_CLASS": "9-A"
   },
   "routes": [
     {
