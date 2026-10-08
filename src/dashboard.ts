@@ -4,7 +4,7 @@ import { destroySession, getSession, requestLoginCode, setSessionCookie, clearSe
 type Plan={date:string;version:number;class:string;lessons:Array<Record<string,unknown>>};
 
 const esc=(v:unknown)=>String(v??"").replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;").replaceAll("'","&#039;");
-const cookies=(r:Request)=>Object.fromEntries((r.headers.get("Cookie")??"").split(";").filter(Boolean).map(p=>{const [k,...v]=p.trim().split("=");return [k,decodeURIComponent(v.join("=")||"")]}));
+const cookies=(r:Request)=>{const result:Record<string,string>={};for(const p of (r.headers.get("Cookie")??"").split(";").filter(Boolean)){const [k,...v]=p.trim().split("=");if(k)result[k]=decodeURIComponent(v.join("=")||"");}return result;};
 const redirect=(to:string)=>new Response(null,{status:303,headers:{Location:to,"Cache-Control":"no-store"}});
 const page=(title:string,body:string,status=200,headers:HeadersInit={})=>new Response("<!doctype html><html lang=\"de\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><meta name=\"theme-color\" content=\"#111315\"><title>"+esc(title)+"</title><style>"+css+"</style></head><body><main>"+body+"</main></body></html>",{status,headers:{"content-type":"text/html; charset=utf-8","cache-control":"no-store",...headers}});
 const dateText=(d:string)=>new Intl.DateTimeFormat("de-DE",{weekday:"long",day:"2-digit",month:"2-digit",year:"numeric"}).format(new Date(d+"T12:00:00Z"));
