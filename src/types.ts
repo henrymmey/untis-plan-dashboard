@@ -9,6 +9,8 @@ export interface Env {
   SMTP_SECURITY: string;
   SMTP_USERNAME: string;
   SMTP_PASSWORD: string;
+  TURNSTILE_SITEKEY: string;
+  TURNSTILE_SECRET: string;
   DEFAULT_CLASS: string;
   API_KEY: string;
 }
