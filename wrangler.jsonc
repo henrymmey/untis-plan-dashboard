@@ -2,7 +2,6 @@
   "name": "untis-to-api",
   "main": "src/index.ts",
   "compatibility_date": "2026-10-06",
-  "compatibility_flags": ["nodejs_compat"],
   "d1_databases": [
     {
       "binding": "DB",
@@ -10,20 +9,11 @@
       "database_id": "f0b9a90f-8c89-427e-b1aa-f14323c08f93",
       "migrations_dir": "migrations",
     },
-    {
-      "binding": "untis_to_api",
-      "database_name": "untis_to_api",
-      "database_id": "f0b9a90f-8c89-427e-b1aa-f14323c08f93",
-    },
   ],
   "r2_buckets": [
     {
       "binding": "PDF_BUCKET",
       "bucket_name": "untis-to-api-pdfs",
-    },
-    {
-      "bucket_name": "untis-to-api-pdfs",
-      "binding": "untis_to_api_pdfs",
     },
   ],
   "vars": {
