@@ -137,6 +137,26 @@ export async function requestLoginCode(
   return { email, codeId: Number(inserted.id) };
 }
 
+export async function createLoginChallenge(env: Env, email: string): Promise<string> {
+  const token = randomToken(32);
+  const now = new Date();
+  await env.DB.prepare("DELETE FROM login_challenges WHERE expires_at < ?").bind(now.toISOString()).run();
+  await env.DB.prepare(
+    "INSERT INTO login_challenges (token, email, expires_at, created_at) VALUES (?, ?, ?, ?)",
+  ).bind(token, email.toLowerCase(), new Date(now.getTime() + 10 * 60_000).toISOString(), now.toISOString()).run();
+  return token;
+}
+
+export async function consumeLoginChallenge(env: Env, token: string, email: string): Promise<boolean> {
+  if (!token) return false;
+  const row = await env.DB.prepare(
+    "SELECT email, expires_at FROM login_challenges WHERE token = ? LIMIT 1",
+  ).bind(token).first<{ email: string; expires_at: string }>();
+  if (!row || row.email !== email.toLowerCase() || new Date(row.expires_at).getTime() <= Date.now()) return false;
+  await env.DB.prepare("DELETE FROM login_challenges WHERE token = ?").bind(token).run();
+  return true;
+}
+
 export async function createSessionForEmail(env: Env, email: string): Promise<{ sessionToken: string; user: SessionUser }> {
   const normalizedEmail = email.trim().toLowerCase();
   if (!/^[^@\\s]+@[^@\\s]+$/.test(normalizedEmail)) throw new Error("Ungültige E-Mail-Adresse.");
