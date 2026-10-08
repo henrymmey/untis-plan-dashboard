@@ -3,6 +3,7 @@ export interface Env {
   PDF_BUCKET: R2Bucket;
   ALLOWED_SENDER: string;
   TARGET_CLASS: string;
+  API_KEY: string;
 }
 
 export interface LessonChange {
