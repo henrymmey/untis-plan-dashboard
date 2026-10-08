@@ -73,9 +73,18 @@ async function processEmail(
   message: ForwardableEmailMessage,
   env: Env,
 ): Promise<void> {
-  const allowed = env.ALLOWED_SENDER.toLowerCase().trim();
-  if (allowed && message.from.toLowerCase().trim() !== allowed) {
-    message.setReject(`Sender not allowed. Expected ${allowed}.`);
+  const allowedSenders = env.ALLOWED_SENDER
+    .split(",")
+    .map((sender) => sender.toLowerCase().trim())
+    .filter(Boolean);
+
+  if (
+    allowedSenders.length &&
+    !allowedSenders.includes(message.from.toLowerCase().trim())
+  ) {
+    message.setReject(
+      `Sender not allowed. Expected one of: ${allowedSenders.join(", ")}.`,
+    );
     return;
   }
 
@@ -84,13 +93,12 @@ async function processEmail(
     email.from && "address" in email.from ? email.from.address : undefined;
   if (
     headerSender &&
-    allowed &&
-    headerSender.toLowerCase().trim() !== allowed
+    allowedSenders.length &&
+    !allowedSenders.includes(headerSender.toLowerCase().trim())
   ) {
-    message.setReject("Header sender does not match the configured sender.");
+    message.setReject("Header sender is not allowed.");
     return;
   }
-
   const pdfs = (email.attachments ?? [])
     .filter(
       (a) =>
