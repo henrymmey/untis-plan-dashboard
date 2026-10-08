@@ -435,3 +435,88 @@ curl -H "Authorization: Bearer YOUR_API_KEY" https://api.grueneeule.de/vertretun
 ```
 
 Requests without the correct key receive HTTP 401. API responses use `Cache-Control: no-store` so authenticated plan data is not publicly cached.
+
+
+## Mehrbenutzer-Dashboard
+
+Das Dashboard auf `obs.henrymeyer.de` verwendet eine eigene E-Mail-Code-Anmeldung.
+
+Ablauf:
+
+1. Der Nutzer gibt nur den Benutzernamen vor dem `@` ein, z. B. `henry.meyer`.
+2. Der Worker ergänzt automatisch `@obs-hagen-atw.de`.
+3. Ein sechsstelliger Einmalcode wird an die IServ-Adresse gesendet.
+4. Nach erfolgreicher Anmeldung wählt der Nutzer seine Klasse aus.
+5. Das Dashboard zeigt anschließend immer den Plan dieser Klasse.
+6. Unter **Einstellungen** kann die Klasse jederzeit geändert werden.
+
+Unterstützte Auswahl:
+
+- Klassenstufe 5 bis 10
+- Gymnasium (G)
+- Oberschule (O)
+- Realschule (R)
+- Hauptschule (H)
+- Klassennummer frei als Zahl
+
+Die Klassen werden bewusst nicht serverseitig gegen eine Klassenliste geprüft. Der Nutzer darf eine andere Klasse auswählen und sieht dann deren Plan.
+
+### Zentrale Plan-Einspeisung
+
+Nur der Betreiber muss den IServ-Vertretungsplan einmalig weiterleiten:
+
+~~~text
+IServ Vertretungsplan
+        |
+        v
+vertretung@api.grueneeule.de
+        |
+        v
+Cloudflare Worker
+        |
+        +--> alle erkannten Klassen -> D1
+        +--> Original-PDF -> R2
+~~~
+
+Andere Nutzer müssen keine Mailweiterleitung einrichten.
+
+### Outbound E-Mail
+
+Die Login-Codes werden über den Cloudflare Email Service aus dem Worker versendet. Dafür ist in `wrangler.jsonc` ein `send_email`-Binding mit dem Absender `noreply.homelab@henrymeyer.de` konfiguriert.
+
+Vor dem ersten produktiven Versand muss `henrymeyer.de` im Cloudflare Email Service für Email Sending onboarded sein. Cloudflare verlangt dafür die entsprechende Domain-Konfiguration einschließlich SPF/DKIM. Das Binding ist auf den genannten Absender beschränkt.
+
+### D1-Migration
+
+Nach dem Deploy der neuen Version muss die Auth-Migration einmalig auf Produktion angewendet werden:
+
+~~~bash
+npx wrangler d1 migrations apply untis_to_api --remote
+~~~
+
+Danach existieren die Tabellen:
+
+~~~text
+users
+login_codes
+sessions
+plans
+~~~
+
+### API
+
+Die bisherige API bleibt erhalten. Ohne Klassenangabe verwendet sie weiterhin `DEFAULT_CLASS`, aktuell `9-G1`.
+
+Für eine andere Klasse:
+
+~~~text
+GET /vertretung/plan/2026-10-09/9-G2
+~~~
+
+Für eine bestimmte Version:
+
+~~~text
+GET /vertretung/plan/2026-10-09/2/9-G2
+~~~
+
+Die API bleibt über den Bearer-API-Key geschützt. Das Web-Dashboard verwendet dagegen die E-Mail-Code-Session und benötigt keinen API-Key.
