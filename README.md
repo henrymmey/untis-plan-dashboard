@@ -354,3 +354,59 @@ Prüfe vor einer öffentlichen Weitergabe, ob die Schule die Veröffentlichung d
 - Parser-Tests mit mehreren echten PDFs
 - Monitoring bei ausbleibenden Plänen
 - bessere Erkennung verschiedener Untis-PDF-Layouts
+
+
+## 22. Optional: automatisches Deployment über GitHub Actions
+
+Im Repository liegt bereits .github/workflows/deploy.yml.
+
+Damit jeder Push auf main automatisch nach Cloudflare deployed wird:
+
+1. Cloudflare Dashboard öffnen.
+2. Einen API Token mit den für Workers benötigten Berechtigungen erstellen.
+3. In GitHub zu Settings → Secrets and variables → Actions gehen.
+4. Zwei Repository-Secrets anlegen:
+   - CLOUDFLARE_API_TOKEN
+   - CLOUDFLARE_ACCOUNT_ID
+5. Danach:
+
+~~~bash
+git add .
+git commit -m "Enable automatic deployment"
+git push
+~~~
+
+GitHub Actions installiert die Abhängigkeiten, erzeugt die Worker-Typen, führt den Typecheck aus und deployt anschließend.
+
+Wenn du das automatische Deployment nicht möchtest, kannst du .github/workflows/deploy.yml löschen und weiterhin manuell mit npm run deploy arbeiten.
+
+## 23. Fehlerdiagnose
+
+### Mail kommt nicht an
+
+Prüfen:
+
+- Cloudflare Email Routing ist für die Domain aktiviert.
+- Die Empfangsadresse existiert.
+- Die Route zeigt auf untis-to-api.
+- IServ leitet tatsächlich weiter.
+- Im Cloudflare Email-Routing-Log ist die Mail sichtbar.
+- npx wrangler tail untis-to-api zeigt keinen Reject.
+
+### PDF wird nicht erkannt
+
+Prüfen:
+
+- Die Mail enthält wirklich einen PDF-Anhang.
+- Die PDF ist textbasiert und nicht nur ein Scan.
+- Im PDF steht die Klasse als K 9-G1.
+- Im PDF steht die Untis-Version im Format DD.MM.YYYY (N).
+- Im PDF steht die Überschrift Vertretungsplan Klassen DD.MM. / ...
+
+### Falsches Datum
+
+Der Parser nimmt bewusst nicht den Mail-Empfangstag. Wenn das PDF ein anderes Datumsformat verwendet, muss findPlanDate in src/parser.ts angepasst werden.
+
+### CPU-Fehler
+
+PDF-Parsing ist der teuerste Teil. Wenn der Worker wegen CPU-Limits abbricht, zuerst den Cloudflare-Tarif und die aktuelle Worker-Limit-Dokumentation prüfen. Bei größeren PDFs sollte die Architektur ggf. auf eine asynchrone Verarbeitung über eine Queue erweitert werden.
