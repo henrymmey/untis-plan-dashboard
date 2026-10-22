@@ -13,7 +13,7 @@
     "types": "wrangler types"
   },
   "dependencies": {
-    "unpdf": "^1.8.1",
+    "unpdf": "^1.9.1",
     "postal-mime": "^4.0.4"
   },
   "devDependencies": {
